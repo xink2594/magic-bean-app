@@ -1,24 +1,67 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppStore } from '@/lib/store';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
+const plantTheme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: '#2C6E49',
+    onPrimary: '#F7F3E9',
+    secondary: '#B7D3A8',
+    onSecondary: '#163020',
+    tertiary: '#E89B5C',
+    background: '#F5F1E8',
+    surface: '#FFFDF8',
+    surfaceVariant: '#E5E1D8',
+    outline: '#9AA48F',
+    error: '#B3261E',
+  },
 };
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function AppBootstrap() {
+  const hydrate = useAppStore((state) => state.hydrate);
+  const ready = useAppStore((state) => state.ready);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate]);
+
+  if (!ready) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: plantTheme.colors.background,
+        }}>
+        <ActivityIndicator size="large" color={plantTheme.colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="provision" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="device/[deviceId]" />
+      <Stack.Screen name="device/[deviceId]/diary" />
+      <Stack.Screen name="photo/[recordId]" options={{ presentation: 'card' }} />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <PaperProvider theme={plantTheme}>
+      <AppBootstrap />
+      <StatusBar style="dark" />
+    </PaperProvider>
   );
 }

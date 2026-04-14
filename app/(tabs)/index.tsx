@@ -1,98 +1,182 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useMemo } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { router } from 'expo-router';
+import { Button, Card, Chip, FAB, Text } from 'react-native-paper';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { useAppStore } from '@/lib/store';
 
-export default function HomeScreen() {
+export default function DashboardScreen() {
+  const devices = useAppStore((state) => state.devices);
+  const getLiveStats = useAppStore((state) => state.getLiveStats);
+
+  const heroText = useMemo(() => {
+    if (!devices.length) {
+      return 'Add your first smart planter to start tracking local readings offline.';
+    }
+
+    return `${devices.length} planter${devices.length === 1 ? '' : 's'} linked and ready for local sync.`;
+  }, [devices.length]);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.page}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <Text variant="headlineMedium" style={styles.heroTitle}>
+            Smart Plant Console
+          </Text>
+          <Text variant="bodyLarge" style={styles.heroCopy}>
+            {heroText}
+          </Text>
+          <View style={styles.heroChips}>
+            <Chip icon="database" compact>
+              SQLite local-first
+            </Chip>
+            <Chip icon="wifi-off" compact>
+              Offline capable
+            </Chip>
+          </View>
+        </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        {devices.map((device) => {
+          const stats = getLiveStats(device.id);
+
+          return (
+            <Card key={device.id} style={styles.card} mode="elevated">
+              <Card.Content style={styles.cardContent}>
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="titleLarge">{device.name}</Text>
+                    <Text variant="bodyMedium" style={styles.subtle}>
+                      {device.macAddress}
+                    </Text>
+                  </View>
+                  <Chip icon="leaf" compact>
+                    Active
+                  </Chip>
+                </View>
+
+                <View style={styles.metricRow}>
+                  <Metric label="Air Temp" value={`${stats.airTemp.toFixed(1)}°C`} />
+                  <Metric label="Humidity" value={`${stats.humidity.toFixed(0)}%`} />
+                  <Metric label="Soil" value={`${stats.soilMoisture.toFixed(0)}%`} />
+                </View>
+
+                <View style={styles.actionRow}>
+                  <Button
+                    mode="contained"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/device/[deviceId]',
+                        params: { deviceId: device.id },
+                      } as never)
+                    }>
+                    Open Device
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/device/[deviceId]/diary',
+                        params: { deviceId: device.id },
+                      } as never)
+                    }>
+                    Diary
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+          );
+        })}
+      </ScrollView>
+
+      <FAB
+        icon="plus"
+        style={styles.fab}
+        onPress={() => router.push({ pathname: '/provision' } as never)}
+      />
+    </View>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metricCard}>
+      <Text variant="labelMedium" style={styles.subtle}>
+        {label}
+      </Text>
+      <Text variant="titleMedium" style={styles.metricValue}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  page: {
+    flex: 1,
+    backgroundColor: '#F5F1E8',
+  },
+  content: {
+    padding: 20,
+    gap: 16,
+    paddingBottom: 120,
+  },
+  hero: {
+    backgroundColor: '#254D32',
+    borderRadius: 28,
+    padding: 20,
+    gap: 12,
+  },
+  heroTitle: {
+    color: '#F7F3E9',
+    fontWeight: '700',
+  },
+  heroCopy: {
+    color: '#DCE8D1',
+    lineHeight: 22,
+  },
+  heroChips: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  card: {
+    backgroundColor: '#FFFDF8',
+  },
+  cardContent: {
+    gap: 18,
+  },
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  subtle: {
+    color: '#617062',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  metricRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#EEF3E7',
+    borderRadius: 18,
+    padding: 12,
+    gap: 6,
+  },
+  metricValue: {
+    color: '#163020',
+    fontWeight: '700',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  fab: {
     position: 'absolute',
+    right: 20,
+    bottom: 26,
+    backgroundColor: '#E89B5C',
   },
 });
