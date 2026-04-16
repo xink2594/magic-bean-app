@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppStore } from '@/lib/store';
 
@@ -15,7 +16,7 @@ export default function BLEProvisionScreen() {
   const addProvisionedDevice = useAppStore((state) => state.addProvisionedDevice);
 
   const [selectedId, setSelectedId] = useState(mockBleDevices[0]?.id ?? '');
-  const [ssid, setSsid] = useState('Greenhouse WiFi');
+  const [ssid, setSsid] = useState('温室 Wi-Fi');
   const [password, setPassword] = useState('');
   const [deviceName, setDeviceName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -40,62 +41,64 @@ export default function BLEProvisionScreen() {
   };
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          BLE Provision
-        </Text>
-        <Text variant="bodyLarge" style={styles.subtitle}>
-          Scan for `PLANT_` devices, send Wi-Fi credentials, and save the planter locally.
-        </Text>
-      </View>
+    <SafeAreaView style={styles.page} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text variant="headlineMedium" style={styles.title}>
+            BLE 配网
+          </Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>
+            扫描 `PLANT_` 设备，发送 Wi-Fi 凭据，并将花盆信息保存到本地。
+          </Text>
+        </View>
 
-      <Card style={styles.card}>
-        <Card.Content style={styles.section}>
-          <Text variant="titleMedium">Nearby Devices</Text>
-          <RadioButton.Group onValueChange={setSelectedId} value={selectedId}>
-            {mockBleDevices.map((device) => (
-              <View key={device.id} style={styles.radioRow}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodyLarge">{device.name}</Text>
-                  <Text variant="bodyMedium" style={styles.subtle}>
-                    {device.macAddress}
-                  </Text>
+        <Card style={styles.card}>
+          <Card.Content style={styles.section}>
+            <Text variant="titleMedium">附近设备</Text>
+            <RadioButton.Group onValueChange={setSelectedId} value={selectedId}>
+              {mockBleDevices.map((device) => (
+                <View key={device.id} style={styles.radioRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyLarge">{device.name}</Text>
+                    <Text variant="bodyMedium" style={styles.subtle}>
+                      {device.macAddress}
+                    </Text>
+                  </View>
+                  <RadioButton value={device.id} />
                 </View>
-                <RadioButton value={device.id} />
-              </View>
-            ))}
-          </RadioButton.Group>
-          <HelperText type="info">
-            Replace this mock list with `react-native-ble-plx` scanning for your ESP32 prefix.
-          </HelperText>
-        </Card.Content>
-      </Card>
+              ))}
+            </RadioButton.Group>
+            <HelperText type="info">
+              这里目前是模拟数据，后续可替换为 `react-native-ble-plx` 扫描 ESP32 前缀设备。
+            </HelperText>
+          </Card.Content>
+        </Card>
 
-      <Card style={styles.card}>
-        <Card.Content style={styles.section}>
-          <Text variant="titleMedium">Wi-Fi Credentials</Text>
-          <TextInput label="SSID" value={ssid} onChangeText={setSsid} mode="outlined" />
-          <TextInput
-            label="Password"
-            value={password}
-            onChangeText={setPassword}
-            mode="outlined"
-            secureTextEntry
-          />
-          <TextInput
-            label="Friendly Device Name"
-            value={deviceName}
-            onChangeText={setDeviceName}
-            mode="outlined"
-            placeholder={selectedDevice?.name ?? 'My Smart Pot'}
-          />
-          <Button mode="contained" onPress={onProvision} loading={saving} disabled={saving || !ssid}>
-            Send Credentials & Save
-          </Button>
-        </Card.Content>
-      </Card>
-    </ScrollView>
+        <Card style={styles.card}>
+          <Card.Content style={styles.section}>
+            <Text variant="titleMedium">Wi-Fi 信息</Text>
+            <TextInput label="SSID" value={ssid} onChangeText={setSsid} mode="outlined" />
+            <TextInput
+              label="密码"
+              value={password}
+              onChangeText={setPassword}
+              mode="outlined"
+              secureTextEntry
+            />
+            <TextInput
+              label="设备昵称"
+              value={deviceName}
+              onChangeText={setDeviceName}
+              mode="outlined"
+              placeholder={selectedDevice?.name ?? '我的智能花盆'}
+            />
+            <Button mode="contained" onPress={onProvision} loading={saving} disabled={saving || !ssid}>
+              发送凭据并保存
+            </Button>
+          </Card.Content>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, HelperText, Switch, Text, TextInput } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppStore } from '@/lib/store';
 
@@ -33,59 +34,61 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          Settings
-        </Text>
-        <Text variant="bodyLarge" style={styles.subtitle}>
-          Configure your self-hosted endpoints once and the whole app reads from local config.
-        </Text>
-      </View>
+    <SafeAreaView style={styles.page} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text variant="headlineMedium" style={styles.title}>
+            设置
+          </Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>
+            在这里配置你的自托管服务地址，整个应用都会读取本地配置。
+          </Text>
+        </View>
 
-      <Card style={styles.card}>
-        <Card.Content style={styles.form}>
-          <TextInput
-            label="Custom Backend URL"
-            value={backendUrl}
-            onChangeText={setBackendUrl}
-            mode="outlined"
-            placeholder="https://plant-gateway.local"
-          />
-          <HelperText type="info">Used by the shared Axios client for AI and sync requests.</HelperText>
+        <Card style={styles.card}>
+          <Card.Content style={styles.form}>
+            <TextInput
+              label="自定义后端地址"
+              value={backendUrl}
+              onChangeText={setBackendUrl}
+              mode="outlined"
+              placeholder="https://plant-gateway.local"
+            />
+            <HelperText type="info">供共享的 Axios 客户端读取，用于 AI 诊断与同步请求。</HelperText>
 
-          <TextInput
-            label="LLM API Status"
-            value={llmStatus}
-            onChangeText={setLlmStatus}
-            mode="outlined"
-            placeholder="Connected / Degraded / Offline"
-          />
+            <TextInput
+              label="LLM API 状态"
+              value={llmStatus}
+              onChangeText={setLlmStatus}
+              mode="outlined"
+              placeholder="已连接 / 降级 / 离线"
+            />
 
-          <TextInput
-            label="WebDAV / Sync URL"
-            value={webdavUrl}
-            onChangeText={setWebdavUrl}
-            mode="outlined"
-            placeholder="https://storage.example.com/plants/"
-          />
+            <TextInput
+              label="WebDAV / 同步地址"
+              value={webdavUrl}
+              onChangeText={setWebdavUrl}
+              mode="outlined"
+              placeholder="https://storage.example.com/plants/"
+            />
 
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text variant="titleMedium">Enable Sync</Text>
-              <Text variant="bodyMedium" style={styles.switchCopy}>
-                Keep offline reads local and only use network when you explicitly fetch or sync.
-              </Text>
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text variant="titleMedium">启用同步</Text>
+                <Text variant="bodyMedium" style={styles.switchCopy}>
+                  日记和相册优先从本地读取，只有在你主动获取或同步时才会访问网络。
+                </Text>
+              </View>
+              <Switch value={syncEnabled} onValueChange={setSyncEnabled} />
             </View>
-            <Switch value={syncEnabled} onValueChange={setSyncEnabled} />
-          </View>
 
-          <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>
-            Save Local Settings
-          </Button>
-        </Card.Content>
-      </Card>
-    </ScrollView>
+            <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>
+              保存本地设置
+            </Button>
+          </Card.Content>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

@@ -23,7 +23,7 @@ const defaultStats: LiveStats = {
 
 const defaultConfig: AppConfig = {
   backendUrl: 'https://plant-proxy.local',
-  llmStatus: 'Offline',
+  llmStatus: '离线',
   webdavUrl: 'https://storage.local/webdav/plants/',
   syncEnabled: false,
 };

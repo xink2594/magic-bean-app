@@ -6,7 +6,7 @@ const databasePromise = SQLite.openDatabaseAsync('magic-bean.db');
 
 const defaultConfig: AppConfig = {
   backendUrl: 'https://plant-proxy.local',
-  llmStatus: 'Offline',
+  llmStatus: '离线',
   webdavUrl: 'https://storage.local/webdav/plants/',
   syncEnabled: false,
 };
@@ -46,8 +46,56 @@ export async function initDatabase() {
     );
   }
 
+  await db.runAsync('UPDATE config SET value = ? WHERE key = ? AND value = ?', '离线', 'llmStatus', 'Offline');
+
   const existing = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM devices');
   if ((existing?.count ?? 0) > 0) {
+    await db.runAsync(
+      'UPDATE devices SET name = ? WHERE id = ? AND name = ?',
+      '栀子花盆',
+      'device-demo-1',
+      '角落龟背竹花盆',
+    );
+    await db.runAsync(
+      'UPDATE devices SET name = ? WHERE id = ? AND name = ?',
+      '栀子花盆',
+      'device-demo-1',
+      'Monstera Corner Pot',
+    );
+    await db.runAsync(
+      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
+      '🌿 今天叶片状态稳定，颜色鲜亮，整体精神不错。',
+      'record-1',
+      'New split leaf opened after misting.',
+    );
+    await db.runAsync(
+      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
+      '🌼 新拍的花苞状态很好，土壤微湿，暂时不用补水。',
+      'record-2',
+      'Soil still damp. No watering today.',
+    );
+    await db.runAsync(
+      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
+      '🌿 今天叶片状态稳定，颜色鲜亮，整体精神不错。',
+      'record-1',
+      '喷雾后长出了一片新的裂叶。',
+    );
+    await db.runAsync(
+      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
+      '🌼 新拍的花苞状态很好，土壤微湿，暂时不用补水。',
+      'record-2',
+      '土壤仍然湿润，今天没有浇水。',
+    );
+    await db.runAsync(
+      'UPDATE records SET image_url = ? WHERE id = ?',
+      'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_161923_64c0634d.jpg',
+      'record-1',
+    );
+    await db.runAsync(
+      'UPDATE records SET image_url = ? WHERE id = ?',
+      'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_162259_d094699f.jpg',
+      'record-2',
+    );
     return;
   }
 
@@ -58,7 +106,7 @@ export async function initDatabase() {
     'INSERT INTO devices (id, mac_address, name, created_at) VALUES (?, ?, ?, ?)',
     deviceId,
     'A8:61:0A:10:2C:9F',
-    'Monstera Corner Pot',
+    '栀子花盆',
     now.toISOString(),
   );
 
@@ -68,8 +116,8 @@ export async function initDatabase() {
       deviceId,
       temp: 24.8,
       humidity: 68,
-      imageUrl: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?auto=format&fit=crop&w=1200&q=80',
-      note: 'New split leaf opened after misting.',
+      imageUrl: 'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_161923_64c0634d.jpg',
+      note: '🌿 今天叶片状态稳定，颜色鲜亮，整体精神不错。',
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 3).toISOString(),
     },
     {
@@ -77,8 +125,8 @@ export async function initDatabase() {
       deviceId,
       temp: 25.2,
       humidity: 66,
-      imageUrl: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=1200&q=80',
-      note: 'Soil still damp. No watering today.',
+      imageUrl: 'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_162259_d094699f.jpg',
+      note: '🌼 新拍的花苞状态很好，土壤微湿，暂时不用补水。',
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24).toISOString(),
     },
   ];

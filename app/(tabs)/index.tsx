@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, Chip, FAB, Text } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppStore } from '@/lib/store';
 
@@ -11,28 +12,28 @@ export default function DashboardScreen() {
 
   const heroText = useMemo(() => {
     if (!devices.length) {
-      return 'Add your first smart planter to start tracking local readings offline.';
+      return '添加你的第一台智能花盆，开始离线记录植物环境数据。';
     }
 
-    return `${devices.length} planter${devices.length === 1 ? '' : 's'} linked and ready for local sync.`;
+    return `已连接 ${devices.length} 台花盆设备，随时可以进行本地同步。`;
   }, [devices.length]);
 
   return (
-    <View style={styles.page}>
+    <SafeAreaView style={styles.page} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text variant="headlineMedium" style={styles.heroTitle}>
-            Smart Plant Console
+            智能植物控制台
           </Text>
           <Text variant="bodyLarge" style={styles.heroCopy}>
             {heroText}
           </Text>
           <View style={styles.heroChips}>
             <Chip icon="database" compact>
-              SQLite local-first
+              SQLite 本地优先
             </Chip>
             <Chip icon="wifi-off" compact>
-              Offline capable
+              支持离线使用
             </Chip>
           </View>
         </View>
@@ -51,14 +52,14 @@ export default function DashboardScreen() {
                     </Text>
                   </View>
                   <Chip icon="leaf" compact>
-                    Active
+                    在线
                   </Chip>
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Metric label="Air Temp" value={`${stats.airTemp.toFixed(1)}°C`} />
-                  <Metric label="Humidity" value={`${stats.humidity.toFixed(0)}%`} />
-                  <Metric label="Soil" value={`${stats.soilMoisture.toFixed(0)}%`} />
+                  <Metric label="空气温度" value={`${stats.airTemp.toFixed(1)}°C`} />
+                  <Metric label="空气湿度" value={`${stats.humidity.toFixed(0)}%`} />
+                  <Metric label="土壤湿度" value={`${stats.soilMoisture.toFixed(0)}%`} />
                 </View>
 
                 <View style={styles.actionRow}>
@@ -70,7 +71,7 @@ export default function DashboardScreen() {
                         params: { deviceId: device.id },
                       } as never)
                     }>
-                    Open Device
+                    查看设备
                   </Button>
                   <Button
                     mode="outlined"
@@ -80,7 +81,7 @@ export default function DashboardScreen() {
                         params: { deviceId: device.id },
                       } as never)
                     }>
-                    Diary
+                    成长日记
                   </Button>
                 </View>
               </Card.Content>
@@ -94,7 +95,7 @@ export default function DashboardScreen() {
         style={styles.fab}
         onPress={() => router.push({ pathname: '/provision' } as never)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

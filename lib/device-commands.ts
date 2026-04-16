@@ -6,20 +6,20 @@ export async function issueDeviceCommand(
   stats: LiveStats,
 ) {
   const nextStats = { ...stats };
-  let message = `Command sent to ${deviceId}.`;
+  let message = `已向设备 ${deviceId} 发送控制指令。`;
 
   if (command === 'water') {
     nextStats.soilMoisture = Math.min(100, stats.soilMoisture + 10);
-    message = 'Water command queued over MQTT.';
+    message = '浇水指令已通过 MQTT 入队。';
   }
 
   if (command === 'light') {
     nextStats.airTemp = Math.min(40, stats.airTemp + 0.6);
-    message = 'Grow light command queued over MQTT.';
+    message = '补光指令已通过 MQTT 入队。';
   }
 
   if (command === 'capture') {
-    message = 'Force capture command queued over MQTT.';
+    message = '拍照指令已通过 MQTT 入队。';
   }
 
   return { stats: nextStats, message };

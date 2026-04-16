@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Snackbar, Text } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { issueDeviceCommand } from '@/lib/device-commands';
 import { useAppStore } from '@/lib/store';
@@ -47,37 +48,37 @@ export default function DeviceDetailScreen() {
   };
 
   return (
-    <View style={styles.page}>
+    <SafeAreaView style={styles.page} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.title}>
             {device.name}
           </Text>
           <Text variant="bodyLarge" style={styles.subtitle}>
-            MQTT-ready live panel for {device.macAddress}
+            设备地址：{device.macAddress}
           </Text>
         </View>
 
         <Card style={styles.heroCard}>
           <Card.Content style={styles.heroContent}>
-            <Metric label="Air Temp" value={`${stats.airTemp.toFixed(1)}°C`} accent="#E89B5C" />
-            <Metric label="Humidity" value={`${stats.humidity.toFixed(0)}%`} accent="#5FA8D3" />
-            <Metric label="Soil Moisture" value={`${stats.soilMoisture.toFixed(0)}%`} accent="#6A994E" />
+            <Metric label="空气温度" value={`${stats.airTemp.toFixed(1)}°C`} accent="#E89B5C" />
+            <Metric label="空气湿度" value={`${stats.humidity.toFixed(0)}%`} accent="#5FA8D3" />
+            <Metric label="土壤湿度" value={`${stats.soilMoisture.toFixed(0)}%`} accent="#6A994E" />
           </Card.Content>
         </Card>
 
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
-            <Text variant="titleMedium">Quick Control</Text>
+            <Text variant="titleMedium">快捷控制</Text>
             <View style={styles.buttonGrid}>
               <Button mode="contained" onPress={() => runCommand('water')}>
-                Water
+                浇水
               </Button>
               <Button mode="contained-tonal" onPress={() => runCommand('light')}>
-                Light
+                补光
               </Button>
               <Button mode="outlined" onPress={() => runCommand('capture')}>
-                Force Capture
+                立即拍照
               </Button>
             </View>
           </Card.Content>
@@ -85,9 +86,9 @@ export default function DeviceDetailScreen() {
 
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
-            <Text variant="titleMedium">History</Text>
+            <Text variant="titleMedium">历史记录</Text>
             <Text variant="bodyMedium" style={styles.subtitle}>
-              Diary reads stay local in SQLite and only leave the device when you ask for diagnosis or sync.
+              成长日记默认保存在本地 SQLite，只有在你主动诊断或同步时才会访问网络。
             </Text>
             <Button
               mode="contained"
@@ -97,7 +98,7 @@ export default function DeviceDetailScreen() {
                   params: { deviceId: device.id },
                 } as never)
               }>
-              Open Diary Gallery
+              打开成长相册
             </Button>
           </Card.Content>
         </Card>
@@ -106,7 +107,7 @@ export default function DeviceDetailScreen() {
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
         {message}
       </Snackbar>
-    </View>
+    </SafeAreaView>
   );
 }
 

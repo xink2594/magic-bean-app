@@ -3,7 +3,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Text } from 'react-native-paper';
 import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LATEST_RECORD_ID } from '@/lib/demo-content';
 import { getRecordsByDeviceId } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
 import { PlantRecord } from '@/lib/types';
@@ -27,41 +29,50 @@ export default function DiaryGalleryScreen() {
   }, [deviceId]);
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          {device?.name ?? 'Diary'}
-        </Text>
-        <Text variant="bodyLarge" style={styles.subtitle}>
-          Photo timeline sourced from SQLite for fast offline browsing.
-        </Text>
-      </View>
+    <SafeAreaView style={styles.page} edges={['top']}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text variant="headlineMedium" style={styles.title}>
+            {device?.name ?? '成长日记'}
+          </Text>
+        </View>
 
-      {records.map((record) => (
-        <Card key={record.id} style={styles.card}>
-          <Image source={{ uri: record.imageUrl }} style={styles.image} contentFit="cover" />
-          <Card.Content style={styles.cardContent}>
-            <Text variant="titleMedium">{new Date(record.timestamp).toLocaleString()}</Text>
-            <Text variant="bodyMedium" style={styles.subtle}>
-              {record.note || 'No note yet.'}
-            </Text>
-            <Text variant="bodySmall" style={styles.subtle}>
-              {record.temp.toFixed(1)}°C · {record.humidity.toFixed(0)}% humidity
-            </Text>
-            <Button
-              mode="outlined"
-              onPress={() =>
-                router.push({
-                  pathname: '/photo/[recordId]',
-                  params: { recordId: record.id },
-                } as never)
-              }>
-              Open Photo & AI
-            </Button>
-          </Card.Content>
-        </Card>
-      ))}
-    </ScrollView>
+        {records.map((record) => (
+          <Card key={record.id} style={styles.card}>
+            <Image source={{ uri: record.imageUrl }} style={styles.image} contentFit="cover" />
+            <Card.Content style={styles.cardContent}>
+              <Text variant="titleMedium">📅 {new Date(record.timestamp).toLocaleString()}</Text>
+              <Text variant="bodyMedium" style={styles.subtle}>
+                {record.note || '📝 暂时还没有备注。'}
+              </Text>
+              <Text variant="bodySmall" style={styles.subtle}>
+                🌡️ {record.temp.toFixed(1)}°C · 💧 湿度 {record.humidity.toFixed(0)}%
+              </Text>
+              {record.id === LATEST_RECORD_ID ? (
+                <View style={styles.aiPreview}>
+                  <Text variant="labelLarge" style={styles.aiTitle}>
+                    🤖 AI 速览
+                  </Text>
+                  <Text variant="bodySmall" style={styles.aiCopy}>
+                    健康，长势良好。保持适度浇水、充足散射光，并注意通风。
+                  </Text>
+                </View>
+              ) : null}
+              <Button
+                mode="outlined"
+                onPress={() =>
+                  router.push({
+                    pathname: '/photo/[recordId]',
+                    params: { recordId: record.id },
+                  } as never)
+                }>
+                查看照片与 AI 诊断
+              </Button>
+            </Card.Content>
+          </Card>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -98,5 +109,19 @@ const styles = StyleSheet.create({
   },
   subtle: {
     color: '#617062',
+  },
+  aiPreview: {
+    borderRadius: 14,
+    backgroundColor: '#EEF3E7',
+    padding: 12,
+    gap: 6,
+  },
+  aiTitle: {
+    color: '#23412D',
+    fontWeight: '700',
+  },
+  aiCopy: {
+    color: '#4B5B4D',
+    lineHeight: 18,
   },
 });

@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { MD3LightTheme, PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { useAppStore } from '@/lib/store';
@@ -59,9 +60,11 @@ function AppBootstrap() {
 
 export default function RootLayout() {
   return (
-    <PaperProvider theme={plantTheme}>
-      <AppBootstrap />
-      <StatusBar style="dark" />
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider theme={plantTheme}>
+        <AppBootstrap />
+        <StatusBar style="dark" />
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
