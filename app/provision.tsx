@@ -1,30 +1,48 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, HelperText, RadioButton, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppStore } from '@/lib/store';
 
-const mockBleDevices = [
-  { id: 'ble-1', name: 'PLANT_A1', macAddress: 'A8:61:0A:22:7C:11' },
-  { id: 'ble-2', name: 'PLANT_B2', macAddress: 'A8:61:0A:22:7C:15' },
-  { id: 'ble-3', name: 'PLANT_C3', macAddress: 'A8:61:0A:22:7C:18' },
+const mockWifiDevices = [
+  { id: 'ap-1', ssid: 'MimiClaw-7C11', macAddress: 'MimiClaw-7C11' },
+  { id: 'ap-2', ssid: 'MimiClaw-7C15', macAddress: 'MimiClaw-7C15' },
+  { id: 'ap-3', ssid: 'MimiClaw-7C18', macAddress: 'MimiClaw-7C18' },
 ];
 
-export default function BLEProvisionScreen() {
+export default function WLANProvisionScreen() {
   const addProvisionedDevice = useAppStore((state) => state.addProvisionedDevice);
 
-  const [selectedId, setSelectedId] = useState(mockBleDevices[0]?.id ?? '');
+  const [selectedId, setSelectedId] = useState(mockWifiDevices[0]?.id ?? '');
   const [ssid, setSsid] = useState('温室 Wi-Fi');
   const [password, setPassword] = useState('');
   const [deviceName, setDeviceName] = useState('');
   const [saving, setSaving] = useState(false);
 
   const selectedDevice = useMemo(
-    () => mockBleDevices.find((device) => device.id === selectedId),
+    () => mockWifiDevices.find((device) => device.id === selectedId),
     [selectedId],
   );
+
+  const openSystemWifi = async () => {
+    try {
+      if (Platform.OS === 'ios') {
+        const wifiUrl = 'App-Prefs:root=WIFI';
+        const supported = await Linking.canOpenURL(wifiUrl);
+
+        if (supported) {
+          await Linking.openURL(wifiUrl);
+          return;
+        }
+      }
+
+      await Linking.openSettings();
+    } catch {
+      await Linking.openSettings();
+    }
+  };
 
   const onProvision = async () => {
     if (!selectedDevice) {
@@ -34,7 +52,7 @@ export default function BLEProvisionScreen() {
     setSaving(true);
     await addProvisionedDevice({
       macAddress: selectedDevice.macAddress,
-      name: deviceName.trim() || selectedDevice.name,
+      name: deviceName.trim() || selectedDevice.ssid,
     });
     setSaving(false);
     router.back();
@@ -45,32 +63,48 @@ export default function BLEProvisionScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text variant="headlineMedium" style={styles.title}>
-            BLE 配网
+            WLAN 配网
           </Text>
           <Text variant="bodyLarge" style={styles.subtitle}>
-            扫描 `PLANT_` 设备，发送 Wi-Fi 凭据，并将花盆信息保存到本地。
+            连接 `MimiClaw-xxxx` 热点后，再继续完成家庭网络配置。
           </Text>
         </View>
 
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
             <Text variant="titleMedium">附近设备</Text>
-            <RadioButton.Group onValueChange={setSelectedId} value={selectedId}>
-              {mockBleDevices.map((device) => (
-                <View key={device.id} style={styles.radioRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyLarge">{device.name}</Text>
-                    <Text variant="bodyMedium" style={styles.subtle}>
-                      {device.macAddress}
-                    </Text>
-                  </View>
-                  <RadioButton value={device.id} />
+            {Platform.OS === 'android' ? (
+              <>
+                <RadioButton.Group onValueChange={setSelectedId} value={selectedId}>
+                  {mockWifiDevices.map((device) => (
+                    <View key={device.id} style={styles.radioRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text variant="bodyLarge">{device.ssid}</Text>
+                        <Text variant="bodyMedium" style={styles.subtle}>
+                          热点名称：{device.ssid}
+                        </Text>
+                      </View>
+                      <RadioButton value={device.id} />
+                    </View>
+                  ))}
+                </RadioButton.Group>
+                <HelperText type="info">
+                  Android 端这里展示搜索到的 `MimiClaw-xxxx` 热点，当前为演示数据。
+                </HelperText>
+              </>
+            ) : (
+              <>
+                <View style={styles.iosHint}>
+                  <Text variant="bodyLarge">iPhone 需要先到系统 WLAN 页面连接 `MimiClaw-xxxx`。</Text>
+                  <Text variant="bodyMedium" style={styles.subtle}>
+                    连接成功后，再回到 App 继续后续配网流程。
+                  </Text>
                 </View>
-              ))}
-            </RadioButton.Group>
-            <HelperText type="info">
-              这里目前是模拟数据，后续可替换为 `react-native-ble-plx` 扫描 ESP32 前缀设备。
-            </HelperText>
+                <Button mode="contained" onPress={openSystemWifi}>
+                  打开系统 WLAN
+                </Button>
+              </>
+            )}
           </Card.Content>
         </Card>
 
@@ -90,7 +124,7 @@ export default function BLEProvisionScreen() {
               value={deviceName}
               onChangeText={setDeviceName}
               mode="outlined"
-              placeholder={selectedDevice?.name ?? '我的智能花盆'}
+              placeholder={selectedDevice?.ssid ?? '我的智能花盆'}
             />
             <Button mode="contained" onPress={onProvision} loading={saving} disabled={saving || !ssid}>
               发送凭据并保存
@@ -139,5 +173,11 @@ const styles = StyleSheet.create({
   },
   subtle: {
     color: '#617062',
+  },
+  iosHint: {
+    gap: 8,
+    backgroundColor: '#EEF3E7',
+    borderRadius: 16,
+    padding: 14,
   },
 });

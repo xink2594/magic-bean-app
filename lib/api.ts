@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 import { DEMO_AI_DIAGNOSIS } from '@/lib/demo-content';
+import { PlantRecord } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 
 export const api = axios.create({
@@ -38,4 +39,35 @@ export async function diagnosePlantImage(imageUrl: string) {
       '- 后端地址读取自 SQLite 持久化的 Zustand 配置。',
     ].join('\n');
   }
+}
+
+export async function pushDiaryRecord(input: {
+  deviceIdentifier: string;
+  record: PlantRecord;
+  note: string;
+}) {
+  const payload = {
+    deviceId: input.deviceIdentifier,
+    records: [
+      {
+        timestamp: new Date(input.record.timestamp).getTime(),
+        temperature: input.record.temp,
+        airHumidity: input.record.humidity,
+        dirtHumidity: getDemoDirtHumidity(input.record.id),
+        imageUrl: input.record.imageUrl,
+        note: input.note,
+      },
+    ],
+  };
+
+  const response = await api.post('/api/sync/diary/push', payload);
+  return response.data;
+}
+
+function getDemoDirtHumidity(recordId: string) {
+  if (recordId === 'record-2') {
+    return 32.5;
+  }
+
+  return 36.0;
 }
