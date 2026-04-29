@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Button, Card, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Snackbar, Text, TextInput } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { diagnosePlantImage } from '@/lib/api';
+import { diagnosePlantImage, pushDiaryRecord } from '@/lib/api';
 import { getDemoDiagnosis } from '@/lib/demo-content';
-import { getRecordById, updateRecordNote } from '@/lib/database';
+import { getDeviceById, getRecordById, updateRecordNote } from '@/lib/database';
 import { PlantRecord } from '@/lib/types';
 
 export default function PhotoDetailAndAIScreen() {
@@ -17,6 +17,8 @@ export default function PhotoDetailAndAIScreen() {
   const [diagnosis, setDiagnosis] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!recordId) {
@@ -48,6 +50,26 @@ export default function PhotoDetailAndAIScreen() {
     setLoading(false);
   };
 
+  const uploadDiary = async () => {
+    setUploading(true);
+
+    try {
+      const device = await getDeviceById(record.deviceId);
+
+      await pushDiaryRecord({
+        deviceIdentifier: device?.macAddress ?? record.deviceId,
+        record,
+        note,
+      });
+
+      setMessage('手记上传成功。');
+    } catch {
+      setMessage('手记上传失败，请检查后端地址或稍后重试。');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -66,6 +88,9 @@ export default function PhotoDetailAndAIScreen() {
             <Button mode="contained-tonal" onPress={saveNote} loading={saving} disabled={saving}>
               保存备注
             </Button>
+            <Button mode="contained" onPress={uploadDiary} loading={uploading} disabled={uploading}>
+              上传手记
+            </Button>
           </Card.Content>
         </Card>
 
@@ -83,6 +108,9 @@ export default function PhotoDetailAndAIScreen() {
           </Card.Content>
         </Card>
       </ScrollView>
+      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2600}>
+        {message}
+      </Snackbar>
     </SafeAreaView>
   );
 }
