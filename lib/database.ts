@@ -1,13 +1,13 @@
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from "expo-sqlite";
 
-import { AppConfig, Device, PlantRecord } from '@/lib/types';
+import { AppConfig, Device, PlantRecord } from "@/lib/types";
 
-const databasePromise = SQLite.openDatabaseAsync('magic-bean.db');
+const databasePromise = SQLite.openDatabaseAsync("magic-bean.db");
 
 const defaultConfig: AppConfig = {
-  backendUrl: 'https://plant-proxy.local',
-  llmStatus: '离线',
-  webdavUrl: 'https://storage.local/webdav/plants/',
+  backendUrl: "https://plant-proxy.local",
+  llmStatus: "离线",
+  webdavUrl: "https://storage.local/webdav/plants/",
   syncEnabled: false,
 };
 
@@ -40,110 +40,18 @@ export async function initDatabase() {
 
   for (const [key, value] of Object.entries(defaultConfig)) {
     await db.runAsync(
-      'INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)',
+      "INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)",
       key,
       String(value),
     );
   }
 
-  await db.runAsync('UPDATE config SET value = ? WHERE key = ? AND value = ?', '离线', 'llmStatus', 'Offline');
-
-  const existing = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM devices');
-  if ((existing?.count ?? 0) > 0) {
-    await db.runAsync(
-      'UPDATE devices SET name = ? WHERE id = ? AND name = ?',
-      '栀子花盆',
-      'device-demo-1',
-      '角落龟背竹花盆',
-    );
-    await db.runAsync(
-      'UPDATE devices SET name = ? WHERE id = ? AND name = ?',
-      '栀子花盆',
-      'device-demo-1',
-      'Monstera Corner Pot',
-    );
-    await db.runAsync(
-      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
-      '🌿 今天叶片状态稳定，颜色鲜亮，整体精神不错。',
-      'record-1',
-      'New split leaf opened after misting.',
-    );
-    await db.runAsync(
-      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
-      '🌼 新拍的花苞状态很好，土壤微湿，暂时不用补水。',
-      'record-2',
-      'Soil still damp. No watering today.',
-    );
-    await db.runAsync(
-      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
-      '🌿 今天叶片状态稳定，颜色鲜亮，整体精神不错。',
-      'record-1',
-      '喷雾后长出了一片新的裂叶。',
-    );
-    await db.runAsync(
-      'UPDATE records SET note = ? WHERE id = ? AND note = ?',
-      '🌼 新拍的花苞状态很好，土壤微湿，暂时不用补水。',
-      'record-2',
-      '土壤仍然湿润，今天没有浇水。',
-    );
-    await db.runAsync(
-      'UPDATE records SET image_url = ? WHERE id = ?',
-      'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_161923_64c0634d.jpg',
-      'record-1',
-    );
-    await db.runAsync(
-      'UPDATE records SET image_url = ? WHERE id = ?',
-      'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_162259_d094699f.jpg',
-      'record-2',
-    );
-    return;
-  }
-
-  const now = new Date();
-  const deviceId = 'device-demo-1';
-
   await db.runAsync(
-    'INSERT INTO devices (id, mac_address, name, created_at) VALUES (?, ?, ?, ?)',
-    deviceId,
-    'A8:61:0A:10:2C:9F',
-    '栀子花盆',
-    now.toISOString(),
+    "UPDATE config SET value = ? WHERE key = ? AND value = ?",
+    "离线",
+    "llmStatus",
+    "Offline",
   );
-
-  const seedRows = [
-    {
-      id: 'record-1',
-      deviceId,
-      temp: 24.8,
-      humidity: 68,
-      imageUrl: 'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_161923_64c0634d.jpg',
-      note: '🌿 今天叶片状态稳定，颜色鲜亮，整体精神不错。',
-      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    },
-    {
-      id: 'record-2',
-      deviceId,
-      temp: 25.2,
-      humidity: 66,
-      imageUrl: 'https://pub-fea7f2de962241af9278c0306e23517e.r2.dev/plant_20260416_162259_d094699f.jpg',
-      note: '🌼 新拍的花苞状态很好，土壤微湿，暂时不用补水。',
-      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24).toISOString(),
-    },
-  ];
-
-  for (const record of seedRows) {
-    await db.runAsync(
-      `INSERT INTO records (id, device_id, temp, humidity, image_url, note, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      record.id,
-      record.deviceId,
-      record.temp,
-      record.humidity,
-      record.imageUrl,
-      record.note,
-      record.timestamp,
-    );
-  }
 }
 
 export async function getDevices(): Promise<Device[]> {
@@ -153,7 +61,9 @@ export async function getDevices(): Promise<Device[]> {
     mac_address: string;
     name: string;
     created_at: string;
-  }>('SELECT id, mac_address, name, created_at FROM devices ORDER BY created_at DESC');
+  }>(
+    "SELECT id, mac_address, name, created_at FROM devices ORDER BY created_at DESC",
+  );
 
   return rows.map((row) => ({
     id: row.id,
@@ -163,7 +73,33 @@ export async function getDevices(): Promise<Device[]> {
   }));
 }
 
-export async function addDevice(input: Pick<Device, 'macAddress' | 'name'>): Promise<Device> {
+export async function getDeviceById(deviceId: string): Promise<Device | null> {
+  const db = await databasePromise;
+  const row = await db.getFirstAsync<{
+    id: string;
+    mac_address: string;
+    name: string;
+    created_at: string;
+  }>(
+    "SELECT id, mac_address, name, created_at FROM devices WHERE id = ?",
+    deviceId,
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    macAddress: row.mac_address,
+    name: row.name,
+    createdAt: row.created_at,
+  };
+}
+
+export async function addDevice(
+  input: Pick<Device, "macAddress" | "name">,
+): Promise<Device> {
   const db = await databasePromise;
   const device: Device = {
     id: `device-${Date.now()}`,
@@ -173,7 +109,7 @@ export async function addDevice(input: Pick<Device, 'macAddress' | 'name'>): Pro
   };
 
   await db.runAsync(
-    'INSERT INTO devices (id, mac_address, name, created_at) VALUES (?, ?, ?, ?)',
+    "INSERT INTO devices (id, mac_address, name, created_at) VALUES (?, ?, ?, ?)",
     device.id,
     device.macAddress,
     device.name,
@@ -185,7 +121,9 @@ export async function addDevice(input: Pick<Device, 'macAddress' | 'name'>): Pro
 
 export async function getConfig(): Promise<AppConfig> {
   const db = await databasePromise;
-  const rows = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM config');
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    "SELECT key, value FROM config",
+  );
   const config = rows.reduce<Record<string, string>>((accumulator, row) => {
     accumulator[row.key] = row.value;
     return accumulator;
@@ -195,7 +133,7 @@ export async function getConfig(): Promise<AppConfig> {
     backendUrl: config.backendUrl ?? defaultConfig.backendUrl,
     llmStatus: config.llmStatus ?? defaultConfig.llmStatus,
     webdavUrl: config.webdavUrl ?? defaultConfig.webdavUrl,
-    syncEnabled: config.syncEnabled === 'true',
+    syncEnabled: config.syncEnabled === "true",
   };
 }
 
@@ -212,7 +150,18 @@ export async function saveConfig(config: AppConfig) {
   }
 }
 
-export async function getRecordsByDeviceId(deviceId: string): Promise<PlantRecord[]> {
+export async function clearLocalData() {
+  const db = await databasePromise;
+
+  await db.execAsync(`
+    DELETE FROM records;
+    DELETE FROM devices;
+  `);
+}
+
+export async function getRecordsByDeviceId(
+  deviceId: string,
+): Promise<PlantRecord[]> {
   const db = await databasePromise;
   const rows = await db.getAllAsync<{
     id: string;
@@ -233,7 +182,9 @@ export async function getRecordsByDeviceId(deviceId: string): Promise<PlantRecor
   return rows.map(mapRecord);
 }
 
-export async function getRecordById(recordId: string): Promise<PlantRecord | null> {
+export async function getRecordById(
+  recordId: string,
+): Promise<PlantRecord | null> {
   const db = await databasePromise;
   const row = await db.getFirstAsync<{
     id: string;
@@ -255,7 +206,7 @@ export async function getRecordById(recordId: string): Promise<PlantRecord | nul
 
 export async function updateRecordNote(recordId: string, note: string) {
   const db = await databasePromise;
-  await db.runAsync('UPDATE records SET note = ? WHERE id = ?', note, recordId);
+  await db.runAsync("UPDATE records SET note = ? WHERE id = ?", note, recordId);
 }
 
 function mapRecord(row: {

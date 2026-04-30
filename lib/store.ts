@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { addDevice, getConfig, getDevices, initDatabase, saveConfig } from '@/lib/database';
+import { addDevice, clearLocalData, getConfig, getDevices, initDatabase, saveConfig } from '@/lib/database';
 import { AppConfig, Device, LiveStats } from '@/lib/types';
 
 type AppState = {
@@ -10,6 +10,7 @@ type AppState = {
   liveStats: Record<string, LiveStats>;
   hydrate: () => Promise<void>;
   saveSettings: (config: AppConfig) => Promise<void>;
+  clearAppData: () => Promise<void>;
   addProvisionedDevice: (input: Pick<Device, 'macAddress' | 'name'>) => Promise<void>;
   updateLiveStats: (deviceId: string, stats: Partial<LiveStats>) => void;
   getLiveStats: (deviceId: string) => LiveStats;
@@ -47,6 +48,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveSettings: async (config) => {
     await saveConfig(config);
     set({ config });
+  },
+  clearAppData: async () => {
+    await clearLocalData();
+    set({
+      devices: [],
+      liveStats: {},
+    });
   },
   addProvisionedDevice: async (input) => {
     const device = await addDevice(input);

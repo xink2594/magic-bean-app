@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button, Card, HelperText, Switch, Text, TextInput } from 'react-native-paper';
+import { Button, Card, HelperText, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppStore } from '@/lib/store';
@@ -8,12 +8,15 @@ import { useAppStore } from '@/lib/store';
 export default function SettingsScreen() {
   const config = useAppStore((state) => state.config);
   const saveSettings = useAppStore((state) => state.saveSettings);
+  const clearAppData = useAppStore((state) => state.clearAppData);
 
   const [backendUrl, setBackendUrl] = useState(config.backendUrl);
   const [llmStatus, setLlmStatus] = useState(config.llmStatus);
   const [webdavUrl, setWebdavUrl] = useState(config.webdavUrl);
   const [syncEnabled, setSyncEnabled] = useState(config.syncEnabled);
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     setBackendUrl(config.backendUrl);
@@ -31,6 +34,13 @@ export default function SettingsScreen() {
       syncEnabled,
     });
     setSaving(false);
+  };
+
+  const onClearLocalData = async () => {
+    setClearing(true);
+    await clearAppData();
+    setMessage('本地设备和手记数据已清除。');
+    setClearing(false);
   };
 
   return (
@@ -87,7 +97,28 @@ export default function SettingsScreen() {
             </Button>
           </Card.Content>
         </Card>
+
+        <Card style={styles.card}>
+          <Card.Content style={styles.form}>
+            <Text variant="titleMedium">本地数据</Text>
+            <Text variant="bodyMedium" style={styles.switchCopy}>
+              清除当前设备列表和成长日记记录，配置项会保留。
+            </Text>
+            <Button
+              mode="outlined"
+              buttonColor="#FFF4F2"
+              textColor="#B3261E"
+              onPress={onClearLocalData}
+              loading={clearing}
+              disabled={clearing}>
+              清除本地数据
+            </Button>
+          </Card.Content>
+        </Card>
       </ScrollView>
+      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2600}>
+        {message}
+      </Snackbar>
     </SafeAreaView>
   );
 }
