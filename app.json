@@ -11,14 +11,19 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xink2594.magicbean",
+      "entitlements": {
+        "com.apple.developer.networking.wifi-info": true
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Magic Bean 需要访问相机，以便您扫描和记录设备状态。",
         "NSPhotoLibraryUsageDescription": "Magic Bean 需要访问相册，以便您上传和管理图片。",
-        "NSLocalNetworkUsageDescription": "Magic Bean 需要使用本地网络来搜索和连接您的智能节点设备。"
+        "NSLocalNetworkUsageDescription": "Magic Bean 需要使用本地网络来搜索和连接您的智能节点设备。",
+        "NSLocationWhenInUseUsageDescription": "Magic Bean 需要定位权限，以便读取当前连接的 Wi‑Fi 并发现附近设备。"
       }
     },
     "android": {
       "package": "com.xink2594.magicbean",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -71,7 +76,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-wifi-reborn"
     ],
     "experiments": {
       "typedRoutes": true,
