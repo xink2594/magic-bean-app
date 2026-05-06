@@ -5,10 +5,7 @@ import * as Location from 'expo-location';
 import NetInfo from '@react-native-community/netinfo';
 import { Button, Card, Chip, HelperText, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import WifiManager, { WifiEntry } from 'react-native-wifi-reborn';
-
-import { useAppStore } from '@/lib/store';
 
 type NearbyAp = {
   id: string;
@@ -17,49 +14,13 @@ type NearbyAp = {
 };
 
 const MIMICLAW_PREFIX = 'MimiClaw-';
-const AP_PORTAL_URL = 'http://192.168.4.1';
-
-const injectedBridge = `
-  (function() {
-    var sendToReactNative = function(payload) {
-      if (!window.ReactNativeWebView) return;
-      var text = typeof payload === 'string' ? payload : JSON.stringify(payload);
-      window.ReactNativeWebView.postMessage(text);
-    };
-
-    window.addEventListener('message', function(event) {
-      if (event && event.data) {
-        sendToReactNative(event.data);
-      }
-    });
-
-    document.addEventListener('message', function(event) {
-      if (event && event.data) {
-        sendToReactNative(event.data);
-      }
-    });
-
-    var originalPostMessage = window.postMessage;
-    window.postMessage = function(data) {
-      sendToReactNative(data);
-      if (originalPostMessage) {
-        return originalPostMessage.apply(window, arguments);
-      }
-    };
-  })();
-  true;
-`;
 
 export default function WLANProvisionScreen() {
-  const addProvisionedDevice = useAppStore((state) => state.addProvisionedDevice);
-
   const [nearbyAps, setNearbyAps] = useState<NearbyAp[]>([]);
   const [deviceName, setDeviceName] = useState('');
   const [scanning, setScanning] = useState(false);
   const [checkingConnection, setCheckingConnection] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [currentSsid, setCurrentSsid] = useState('');
-  const [portalReady, setPortalReady] = useState(false);
   const [message, setMessage] = useState('');
   const appState = useRef<AppStateStatus>(AppState.currentState);
 
@@ -124,7 +85,6 @@ export default function WLANProvisionScreen() {
     setCheckingConnection(true);
     const ssid = await readCurrentWifiSsid();
     setCurrentSsid(ssid);
-    setPortalReady(ssid.startsWith(MIMICLAW_PREFIX));
     setCheckingConnection(false);
   }, [readCurrentWifiSsid]);
 
@@ -185,33 +145,19 @@ export default function WLANProvisionScreen() {
     };
   }, [checkCurrentConnection, scanNearbyAps]);
 
-  const saveProvisionedDevice = useCallback(async () => {
+  const openPortal = () => {
     if (!connectedMimiClaw) {
       return;
     }
 
-    setSaving(true);
-    await addProvisionedDevice({
-      macAddress: connectedMimiClaw,
-      name: deviceName.trim() || connectedMimiClaw,
-    });
-    setSaving(false);
-  }, [addProvisionedDevice, connectedMimiClaw, deviceName]);
-
-  const handlePortalMessage = useCallback(
-    async (event: WebViewMessageEvent) => {
-      const data = event.nativeEvent.data;
-
-      if (!isConfigSuccessMessage(data)) {
-        return;
-      }
-
-      await saveProvisionedDevice();
-      setMessage('配网成功，正在返回首页。');
-      router.replace('/' as never);
-    },
-    [saveProvisionedDevice],
-  );
+    router.push({
+      pathname: '/provision-portal',
+      params: {
+        ssid: connectedMimiClaw,
+        deviceName: deviceName.trim() || connectedMimiClaw,
+      },
+    } as never);
+  };
 
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
@@ -221,7 +167,7 @@ export default function WLANProvisionScreen() {
             AP 配网
           </Text>
           <Text variant="bodyLarge" style={styles.subtitle}>
-            先连接 `MimiClaw-xxxx` 热点，连接成功后会自动打开 `192.168.4.1`。
+            先连接 `MimiClaw-xxxx` 热点，确认连接成功后，再手动打开设备配网页。
           </Text>
         </View>
 
@@ -279,7 +225,7 @@ export default function WLANProvisionScreen() {
             <Text variant="titleMedium">连接状态</Text>
             <View style={styles.statusRow}>
               <Chip icon={connectedMimiClaw ? 'wifi' : 'wifi-off'} compact>
-                {checkingConnection ? '检测中...' : currentSsid || '当前未连接到设备热点'}
+                {checkingConnection ? '检测中...' : connectedMimiClaw ? `已连接到设备 AP：${connectedMimiClaw}` : currentSsid || '当前未连接到设备热点'}
               </Chip>
               <Button
                 mode="outlined"
@@ -299,34 +245,14 @@ export default function WLANProvisionScreen() {
             />
 
             <HelperText type="info">
-              当检测到你已连接 `MimiClaw-xxxx` 后，下方会自动展示设备自带的配网页。
+              检测到已连接 `MimiClaw-xxxx` 后，下方按钮会从灰色变为可点击状态。
             </HelperText>
+
+            <Button mode="contained" onPress={openPortal} disabled={!connectedMimiClaw}>
+              打开设备配网页
+            </Button>
           </Card.Content>
         </Card>
-
-        {portalReady ? (
-          <Card style={styles.portalCard}>
-            <Card.Content style={styles.portalSection}>
-              <View style={styles.sectionHeader}>
-                <Text variant="titleMedium">设备配网页</Text>
-                <Chip compact icon="lan-connect">
-                  {connectedMimiClaw}
-                </Chip>
-              </View>
-              <View style={styles.webviewWrap}>
-                <WebView
-                  source={{ uri: AP_PORTAL_URL }}
-                  onMessage={handlePortalMessage}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  injectedJavaScriptBeforeContentLoaded={injectedBridge}
-                  originWhitelist={['*']}
-                  startInLoadingState
-                />
-              </View>
-            </Card.Content>
-          </Card>
-        ) : null}
       </ScrollView>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2800}>
@@ -350,23 +276,6 @@ function uniqBySsid(items: WifiEntry[]) {
 
 function sanitizeSsid(value?: string | null) {
   return (value ?? '').replace(/^"|"$/g, '').trim();
-}
-
-function isConfigSuccessMessage(message: string) {
-  if (message === 'CONFIG_SUCCESS') {
-    return true;
-  }
-
-  try {
-    const payload = JSON.parse(message) as { type?: string; event?: string; status?: string };
-    return (
-      payload.type === 'CONFIG_SUCCESS' ||
-      payload.event === 'CONFIG_SUCCESS' ||
-      payload.status === 'CONFIG_SUCCESS'
-    );
-  } catch {
-    return message.includes('CONFIG_SUCCESS');
-  }
 }
 
 const styles = StyleSheet.create({
@@ -393,16 +302,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFDF8',
   },
-  portalCard: {
-    backgroundColor: '#FFFDF8',
-    overflow: 'hidden',
-  },
   section: {
     gap: 14,
-  },
-  portalSection: {
-    gap: 14,
-    paddingBottom: 18,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -441,11 +342,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     flexWrap: 'wrap',
-  },
-  webviewWrap: {
-    minHeight: 460,
-    overflow: 'hidden',
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
   },
 });

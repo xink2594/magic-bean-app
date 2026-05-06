@@ -51,6 +51,7 @@ function AppBootstrap() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="provision" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="provision-portal" options={{ presentation: 'card' }} />
       <Stack.Screen name="device/[deviceId]" />
       <Stack.Screen name="device/[deviceId]/diary" />
       <Stack.Screen name="photo/[recordId]" options={{ presentation: 'card' }} />
