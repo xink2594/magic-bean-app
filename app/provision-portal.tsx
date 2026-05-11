@@ -54,15 +54,19 @@ export default function ProvisionPortalScreen() {
   const handlePortalMessage = useCallback(
     async (event: WebViewMessageEvent) => {
       const data = event.nativeEvent.data;
+      const payload = getConfigSuccessPayload(data);
 
-      if (!isConfigSuccessMessage(data) || !ssid) {
+      if (!payload.success || !ssid) {
         return;
       }
 
       setSaving(true);
+      const macAddress = payload.mac || ssid;
       await addProvisionedDevice({
-        macAddress: ssid,
-        name: (deviceName || ssid).trim(),
+        macAddress,
+        name: (deviceName || macAddress).trim(),
+        mqttUrl: payload.mqtt || '',
+        mqttTopic: `plant/${macAddress}/status`,
       });
       setSaving(false);
       setMessage('配网成功，正在返回首页。');
@@ -117,20 +121,27 @@ export default function ProvisionPortalScreen() {
   );
 }
 
-function isConfigSuccessMessage(message: string) {
+function getConfigSuccessPayload(message: string) {
   if (message === 'CONFIG_SUCCESS') {
-    return true;
+    return { success: true, mac: '' };
   }
 
   try {
-    const payload = JSON.parse(message) as { type?: string; event?: string; status?: string };
-    return (
+    const payload = JSON.parse(message) as {
+      type?: string;
+      event?: string;
+      status?: string;
+      mac?: string;
+      mqtt?: string;
+    };
+    const success =
       payload.type === 'CONFIG_SUCCESS' ||
       payload.event === 'CONFIG_SUCCESS' ||
-      payload.status === 'CONFIG_SUCCESS'
-    );
+      payload.status === 'CONFIG_SUCCESS';
+
+    return { success, mac: payload.mac ?? '', mqtt: payload.mqtt ?? '' };
   } catch {
-    return message.includes('CONFIG_SUCCESS');
+    return { success: message.includes('CONFIG_SUCCESS'), mac: '', mqtt: '' };
   }
 }
 
