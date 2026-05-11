@@ -6,8 +6,7 @@ import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
-import { disconnectPresenceClient, syncDevicePresence } from '@/lib/mqtt-presence';
-import { setSensorDataCallback, setConnectionStatusCallback, disconnectAllClients } from '@/lib/mqtt-data';
+import { setSensorDataCallback, setConnectionStatusCallback, setPresenceCallback, disconnectAllClients } from '@/lib/mqtt-data';
 import { useAppStore } from '@/lib/store';
 
 const plantTheme = {
@@ -30,7 +29,6 @@ const plantTheme = {
 function AppBootstrap() {
   const hydrate = useAppStore((state) => state.hydrate);
   const ready = useAppStore((state) => state.ready);
-  const devices = useAppStore((state) => state.devices);
   const setDevicePresence = useAppStore((state) => state.setDevicePresence);
   const setSensorDataFromMqtt = useAppStore((state) => state.setSensorDataFromMqtt);
   const setMqttConnectionStatus = useAppStore((state) => state.setMqttConnectionStatus);
@@ -48,28 +46,11 @@ function AppBootstrap() {
     setConnectionStatusCallback((brokerUrl, status) => {
       setMqttConnectionStatus(brokerUrl, status);
     });
-  }, [setSensorDataFromMqtt, setMqttConnectionStatus]);
 
-  // MQTT 在线状态订阅
-  useEffect(() => {
-    if (!ready) {
-      return;
-    }
-
-    const cleanup = syncDevicePresence({
-      devices,
-      onPresence: (macAddress, isOnline) => {
-        setDevicePresence(macAddress, isOnline);
-      },
+    setPresenceCallback((macAddress, isOnline) => {
+      setDevicePresence(macAddress, isOnline);
     });
-
-    return () => {
-      cleanup();
-      if (!devices.length) {
-        disconnectPresenceClient();
-      }
-    };
-  }, [devices, ready, setDevicePresence]);
+  }, [setSensorDataFromMqtt, setMqttConnectionStatus, setDevicePresence]);
 
   if (!ready) {
     return (

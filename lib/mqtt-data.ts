@@ -4,6 +4,7 @@ import { Device, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
 
 type ConnectionStatusCallback = (brokerUrl: string, status: MqttConnectionStatus) => void;
 type SensorDataCallback = (macAddress: string, data: MqttSensorData) => void;
+type PresenceCallback = (macAddress: string, isOnline: boolean) => void;
 
 type DataBrokerRuntime = {
   client: MqttClient;
@@ -14,6 +15,7 @@ type DataBrokerRuntime = {
 const dataRuntimes = new Map<string, DataBrokerRuntime>();
 let onSensorDataCallback: SensorDataCallback | null = null;
 let onConnectionStatusCallback: ConnectionStatusCallback | null = null;
+let onPresenceCallback: PresenceCallback | null = null;
 
 /**
  * 设置传感器数据回调
@@ -30,15 +32,26 @@ export function setConnectionStatusCallback(callback: ConnectionStatusCallback) 
 }
 
 /**
- * 解析 MQTT 主题，提取 MAC 地址
- * 主题格式: plant/{MAC}/data
+ * 设置在线状态回调
  */
-function parseTopic(topic: string): { macAddress: string; isValid: boolean } {
+export function setPresenceCallback(callback: PresenceCallback) {
+  onPresenceCallback = callback;
+}
+
+/**
+ * 解析 MQTT 主题，提取 MAC 地址和类型
+ * 主题格式: plant/{MAC}/data 或 plant/{MAC}/status
+ */
+function parseTopic(topic: string): { macAddress: string; type: 'data' | 'status' | null } {
   const segments = topic.split('/');
-  if (segments.length >= 3 && segments[0] === 'plant' && segments[2] === 'data') {
-    return { macAddress: segments[1], isValid: true };
+  if (segments.length >= 3 && segments[0] === 'plant') {
+    const macAddress = segments[1];
+    const type = segments[2];
+    if (type === 'data' || type === 'status') {
+      return { macAddress, type };
+    }
   }
-  return { macAddress: '', isValid: false };
+  return { macAddress: '', type: null };
 }
 
 /**
@@ -66,12 +79,22 @@ export function connectToDevice(device: Device): boolean {
     return false;
   }
 
-  // 如果已经连接或正在连接，直接返回
+  // 如果已经连接或正在连接，确保订阅该设备的主题
   const existingRuntime = dataRuntimes.get(brokerUrl);
-  if (existingRuntime && existingRuntime.status !== 'error' && existingRuntime.status !== 'disconnected') {
-    // 确保订阅了该设备的主题
-    subscribeDeviceTopic(brokerUrl, device);
-    return true;
+  if (existingRuntime) {
+    if (existingRuntime.status === 'connected') {
+      // 已连接，直接订阅
+      subscribeDeviceTopics(brokerUrl, device);
+      return true;
+    } else if (existingRuntime.status === 'connecting') {
+      // 正在连接，添加到待订阅列表
+      existingRuntime.topics.add(`plant/${device.macAddress.toUpperCase()}/data`);
+      if (device.mqttTopic) {
+        existingRuntime.topics.add(device.mqttTopic);
+      }
+      return true;
+    }
+    // error 或 disconnected 状态，继续创建新连接
   }
 
   // 创建新连接
@@ -86,33 +109,54 @@ export function connectToDevice(device: Device): boolean {
     console.log('[MQTT Data] Connected to broker:', brokerUrl);
     updateConnectionStatus(brokerUrl, 'connected');
 
-    // 连接成功后订阅所有该 broker 上的设备主题
+    // 连接成功后订阅所有待订阅的主题
     const runtime = dataRuntimes.get(brokerUrl);
     if (runtime) {
-      // 订阅当前设备
-      subscribeDeviceTopic(brokerUrl, device);
+      runtime.topics.forEach((topic) => {
+        runtime.client.subscribe(topic);
+      });
     }
   });
 
   client.on('message', (topic: string, payload: Buffer | Uint8Array) => {
-    const { macAddress, isValid } = parseTopic(topic);
-    if (!isValid || !onSensorDataCallback) {
+    const { macAddress, type } = parseTopic(topic);
+
+    if (!type) {
+      // 尝试从 status 主题格式解析
+      const statusMac = extractMacAddressFromStatusTopic(topic);
+      if (statusMac && onPresenceCallback) {
+        try {
+          const parsed = JSON.parse(payload.toString()) as { status?: string };
+          onPresenceCallback(statusMac, parsed.status === 'online');
+        } catch {
+          onPresenceCallback(statusMac, false);
+        }
+      }
       return;
     }
 
-    try {
-      const data = JSON.parse(payload.toString());
-      const sensorData = data as MqttSensorData;
+    if (type === 'data' && onSensorDataCallback) {
+      try {
+        const data = JSON.parse(payload.toString());
+        const sensorData = data as MqttSensorData;
 
-      if (
-        typeof sensorData.temperature === 'number' &&
-        typeof sensorData.air_humidity === 'number' &&
-        typeof sensorData.dirt_humidity === 'number'
-      ) {
-        onSensorDataCallback(macAddress, sensorData);
+        if (
+          typeof sensorData.temperature === 'number' &&
+          typeof sensorData.air_humidity === 'number' &&
+          typeof sensorData.dirt_humidity === 'number'
+        ) {
+          onSensorDataCallback(macAddress, sensorData);
+        }
+      } catch (error) {
+        console.warn('[MQTT Data] Failed to parse sensor data:', topic, error);
       }
-    } catch (error) {
-      console.warn('[MQTT Data] Failed to parse message:', topic, error);
+    } else if (type === 'status' && onPresenceCallback) {
+      try {
+        const parsed = JSON.parse(payload.toString()) as { status?: string };
+        onPresenceCallback(macAddress, parsed.status === 'online');
+      } catch {
+        onPresenceCallback(macAddress, false);
+      }
     }
   });
 
@@ -131,37 +175,103 @@ export function connectToDevice(device: Device): boolean {
     updateConnectionStatus(brokerUrl, 'disconnected');
   });
 
+  // 初始化 runtime，添加待订阅的主题
+  const topics = new Set<string>();
+  topics.add(`plant/${device.macAddress.toUpperCase()}/data`);
+  if (device.mqttTopic) {
+    topics.add(device.mqttTopic);
+  }
+
   const runtime: DataBrokerRuntime = {
     client,
-    topics: new Set<string>(),
+    topics,
     status: 'connecting',
   };
   dataRuntimes.set(brokerUrl, runtime);
-
-  // 订阅设备主题
-  subscribeDeviceTopic(brokerUrl, device);
 
   return true;
 }
 
 /**
- * 订阅设备主题
+ * 从 status 主题格式提取 MAC 地址
+ * 支持 plant/{MAC}/status 格式
  */
-function subscribeDeviceTopic(brokerUrl: string, device: Device) {
+function extractMacAddressFromStatusTopic(topic: string): string {
+  const segments = topic.split('/');
+  if (segments.length >= 3 && segments[0] === 'plant' && segments[2] === 'status') {
+    return segments[1];
+  }
+  return '';
+}
+
+/**
+ * 订阅设备的所有主题
+ */
+function subscribeDeviceTopics(brokerUrl: string, device: Device) {
   const runtime = dataRuntimes.get(brokerUrl);
   if (!runtime) {
     return;
   }
 
   const mac = device.macAddress.toUpperCase();
-  const topic = `plant/${mac}/data`;
+  const dataTopic = `plant/${mac}/data`;
 
-  if (!runtime.topics.has(topic)) {
-    // 如果已连接，立即订阅
+  // 订阅 data 主题
+  if (!runtime.topics.has(dataTopic)) {
     if (runtime.status === 'connected') {
-      runtime.client.subscribe(topic);
+      runtime.client.subscribe(dataTopic);
     }
-    runtime.topics.add(topic);
+    runtime.topics.add(dataTopic);
+  }
+
+  // 订阅 status 主题（如果有配置）
+  if (device.mqttTopic && !runtime.topics.has(device.mqttTopic)) {
+    if (runtime.status === 'connected') {
+      runtime.client.subscribe(device.mqttTopic);
+    }
+    runtime.topics.add(device.mqttTopic);
+  }
+}
+
+/**
+ * 同步所有设备的主题订阅（用于批量更新）
+ */
+export function syncDeviceSubscriptions(devices: Device[]) {
+  const groups = groupDevicesByBroker(devices);
+
+  for (const [brokerUrl, brokerDevices] of groups.entries()) {
+    const runtime = dataRuntimes.get(brokerUrl);
+    if (!runtime || runtime.status !== 'connected') {
+      // 如果没有连接，为每个设备创建连接
+      brokerDevices.forEach((device) => connectToDevice(device));
+      continue;
+    }
+
+    // 收集所有需要订阅的主题
+    const nextTopics = new Set<string>();
+    for (const device of brokerDevices) {
+      const mac = device.macAddress.toUpperCase();
+      nextTopics.add(`plant/${mac}/data`);
+      if (device.mqttTopic) {
+        nextTopics.add(device.mqttTopic);
+      }
+    }
+
+    // 取消订阅不再需要的主题
+    runtime.topics.forEach((topic) => {
+      if (!nextTopics.has(topic)) {
+        runtime.client.unsubscribe(topic);
+        runtime.topics.delete(topic);
+      }
+    });
+
+    // 订阅新主题
+    nextTopics.forEach((topic) => {
+      if (!runtime.topics.has(topic)) {
+        runtime.client.subscribe(topic);
+        runtime.topics.add(topic);
+      }
+    });
   }
 }
 
@@ -247,6 +357,26 @@ export function publishDeviceCommand(
     console.error('[MQTT Data] Failed to publish command:', error);
     return false;
   }
+}
+
+/**
+ * 按 broker URL 分组设备
+ */
+function groupDevicesByBroker(devices: Device[]) {
+  const groups = new Map<string, Device[]>();
+
+  devices.forEach((device) => {
+    const brokerUrl = toMqttWebSocketUrl(device.mqttUrl);
+    if (!brokerUrl) {
+      return;
+    }
+
+    const current = groups.get(brokerUrl) ?? [];
+    current.push(device);
+    groups.set(brokerUrl, current);
+  });
+
+  return groups;
 }
 
 /**
