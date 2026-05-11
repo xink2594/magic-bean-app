@@ -19,7 +19,9 @@ export async function initDatabase() {
       id TEXT PRIMARY KEY NOT NULL,
       mac_address TEXT NOT NULL,
       name TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      mqtt_url TEXT NOT NULL DEFAULT '',
+      mqtt_topic TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS records (
@@ -52,6 +54,9 @@ export async function initDatabase() {
     "llmStatus",
     "Offline",
   );
+
+  await ensureDeviceMqttColumn(db);
+  await ensureDeviceTopicColumn(db);
 }
 
 export async function getDevices(): Promise<Device[]> {
@@ -61,8 +66,10 @@ export async function getDevices(): Promise<Device[]> {
     mac_address: string;
     name: string;
     created_at: string;
+    mqtt_url: string;
+    mqtt_topic: string;
   }>(
-    "SELECT id, mac_address, name, created_at FROM devices ORDER BY created_at DESC",
+    "SELECT id, mac_address, name, created_at, mqtt_url, mqtt_topic FROM devices ORDER BY created_at DESC",
   );
 
   return rows.map((row) => ({
@@ -70,6 +77,8 @@ export async function getDevices(): Promise<Device[]> {
     macAddress: row.mac_address,
     name: row.name,
     createdAt: row.created_at,
+    mqttUrl: row.mqtt_url,
+    mqttTopic: row.mqtt_topic,
   }));
 }
 
@@ -80,8 +89,10 @@ export async function getDeviceById(deviceId: string): Promise<Device | null> {
     mac_address: string;
     name: string;
     created_at: string;
+    mqtt_url: string;
+    mqtt_topic: string;
   }>(
-    "SELECT id, mac_address, name, created_at FROM devices WHERE id = ?",
+    "SELECT id, mac_address, name, created_at, mqtt_url, mqtt_topic FROM devices WHERE id = ?",
     deviceId,
   );
 
@@ -94,11 +105,13 @@ export async function getDeviceById(deviceId: string): Promise<Device | null> {
     macAddress: row.mac_address,
     name: row.name,
     createdAt: row.created_at,
+    mqttUrl: row.mqtt_url,
+    mqttTopic: row.mqtt_topic,
   };
 }
 
 export async function addDevice(
-  input: Pick<Device, "macAddress" | "name">,
+  input: Pick<Device, "macAddress" | "name"> & { mqttUrl?: string; mqttTopic?: string },
 ): Promise<Device> {
   const db = await databasePromise;
   const device: Device = {
@@ -106,17 +119,47 @@ export async function addDevice(
     macAddress: input.macAddress,
     name: input.name,
     createdAt: new Date().toISOString(),
+    mqttUrl: input.mqttUrl ?? "",
+    mqttTopic: input.mqttTopic ?? `plant/${input.macAddress}/status`,
   };
 
   await db.runAsync(
-    "INSERT INTO devices (id, mac_address, name, created_at) VALUES (?, ?, ?, ?)",
+    "INSERT INTO devices (id, mac_address, name, created_at, mqtt_url, mqtt_topic) VALUES (?, ?, ?, ?, ?, ?)",
     device.id,
     device.macAddress,
     device.name,
     device.createdAt,
+    device.mqttUrl,
+    device.mqttTopic,
   );
 
   return device;
+}
+
+export async function updateDeviceMqttUrl(deviceId: string, mqttUrl: string) {
+  const db = await databasePromise;
+  await db.runAsync("UPDATE devices SET mqtt_url = ? WHERE id = ?", mqttUrl, deviceId);
+}
+
+export async function updateDeviceMqttConfig(
+  deviceId: string,
+  mqttUrl: string,
+  mqttTopic: string,
+) {
+  const db = await databasePromise;
+  await db.runAsync(
+    "UPDATE devices SET mqtt_url = ?, mqtt_topic = ? WHERE id = ?",
+    mqttUrl,
+    mqttTopic,
+    deviceId,
+  );
+}
+
+export async function deleteDevice(deviceId: string) {
+  const db = await databasePromise;
+
+  await db.runAsync("DELETE FROM records WHERE device_id = ?", deviceId);
+  await db.runAsync("DELETE FROM devices WHERE id = ?", deviceId);
 }
 
 export async function getConfig(): Promise<AppConfig> {
@@ -227,4 +270,36 @@ function mapRecord(row: {
     note: row.note,
     timestamp: row.timestamp,
   };
+}
+
+async function ensureDeviceMqttColumn(
+  db: Awaited<ReturnType<typeof SQLite.openDatabaseAsync>>,
+) {
+  const columns = await db.getAllAsync<{
+    name: string;
+  }>("PRAGMA table_info(devices)");
+
+  const hasMqttUrl = columns.some((column) => column.name === "mqtt_url");
+
+  if (!hasMqttUrl) {
+    await db.execAsync(
+      "ALTER TABLE devices ADD COLUMN mqtt_url TEXT NOT NULL DEFAULT '';",
+    );
+  }
+}
+
+async function ensureDeviceTopicColumn(
+  db: Awaited<ReturnType<typeof SQLite.openDatabaseAsync>>,
+) {
+  const columns = await db.getAllAsync<{
+    name: string;
+  }>("PRAGMA table_info(devices)");
+
+  const hasMqttTopic = columns.some((column) => column.name === "mqtt_topic");
+
+  if (!hasMqttTopic) {
+    await db.execAsync(
+      "ALTER TABLE devices ADD COLUMN mqtt_topic TEXT NOT NULL DEFAULT '';",
+    );
+  }
 }

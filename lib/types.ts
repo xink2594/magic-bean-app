@@ -3,6 +3,8 @@ export type Device = {
   macAddress: string;
   name: string;
   createdAt: string;
+  mqttUrl: string;
+  mqttTopic: string;
 };
 
 export type PlantRecord = {

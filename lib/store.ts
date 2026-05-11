@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 
-import { addDevice, clearLocalData, getConfig, getDevices, initDatabase, saveConfig } from '@/lib/database';
+import {
+  addDevice,
+  clearLocalData,
+  deleteDevice,
+  getConfig,
+  getDevices,
+  initDatabase,
+  saveConfig,
+  updateDeviceMqttConfig,
+} from '@/lib/database';
 import { AppConfig, Device, LiveStats } from '@/lib/types';
 
 type AppState = {
@@ -8,10 +17,15 @@ type AppState = {
   config: AppConfig;
   devices: Device[];
   liveStats: Record<string, LiveStats>;
+  devicePresence: Record<string, boolean>;
   hydrate: () => Promise<void>;
   saveSettings: (config: AppConfig) => Promise<void>;
   clearAppData: () => Promise<void>;
-  addProvisionedDevice: (input: Pick<Device, 'macAddress' | 'name'>) => Promise<void>;
+  addProvisionedDevice: (input: Pick<Device, 'macAddress' | 'name' | 'mqttUrl' | 'mqttTopic'>) => Promise<void>;
+  removeDevice: (deviceId: string) => Promise<void>;
+  saveDeviceMqttConfig: (deviceId: string, mqttUrl: string, mqttTopic: string) => Promise<void>;
+  setDevicePresence: (macAddress: string, isOnline: boolean) => void;
+  isDeviceOnline: (macAddress: string) => boolean;
   updateLiveStats: (deviceId: string, stats: Partial<LiveStats>) => void;
   getLiveStats: (deviceId: string) => LiveStats;
 };
@@ -34,6 +48,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   config: defaultConfig,
   devices: [],
   liveStats: {},
+  devicePresence: {},
   hydrate: async () => {
     await initDatabase();
     const [config, devices] = await Promise.all([getConfig(), getDevices()]);
@@ -54,6 +69,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       devices: [],
       liveStats: {},
+      devicePresence: {},
     });
   },
   addProvisionedDevice: async (input) => {
@@ -66,6 +82,42 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     }));
   },
+  saveDeviceMqttConfig: async (deviceId, mqttUrl, mqttTopic) => {
+    await updateDeviceMqttConfig(deviceId, mqttUrl, mqttTopic);
+    set((state) => ({
+      devices: state.devices.map((device) =>
+        device.id === deviceId ? { ...device, mqttUrl, mqttTopic } : device,
+      ),
+    }));
+  },
+  removeDevice: async (deviceId) => {
+    await deleteDevice(deviceId);
+    set((state) => {
+      const nextLiveStats = { ...state.liveStats };
+      const nextPresence = { ...state.devicePresence };
+      const target = state.devices.find((device) => device.id === deviceId);
+
+      delete nextLiveStats[deviceId];
+      if (target) {
+        delete nextPresence[target.macAddress];
+      }
+
+      return {
+        devices: state.devices.filter((device) => device.id !== deviceId),
+        liveStats: nextLiveStats,
+        devicePresence: nextPresence,
+      };
+    });
+  },
+  setDevicePresence: (macAddress, isOnline) => {
+    set((state) => ({
+      devicePresence: {
+        ...state.devicePresence,
+        [macAddress]: isOnline,
+      },
+    }));
+  },
+  isDeviceOnline: (macAddress) => get().devicePresence[macAddress] ?? false,
   updateLiveStats: (deviceId, stats) => {
     set((state) => ({
       liveStats: {
