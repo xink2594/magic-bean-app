@@ -10,7 +10,7 @@ import {
   saveConfig,
   updateDeviceMqttConfig,
 } from '@/lib/database';
-import { AppConfig, Device, LiveStats } from '@/lib/types';
+import { AppConfig, Device, LiveStats, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
 
 type AppState = {
   ready: boolean;
@@ -18,6 +18,7 @@ type AppState = {
   devices: Device[];
   liveStats: Record<string, LiveStats>;
   devicePresence: Record<string, boolean>;
+  mqttConnectionStatus: Record<string, MqttConnectionStatus>;
   hydrate: () => Promise<void>;
   saveSettings: (config: AppConfig) => Promise<void>;
   clearAppData: () => Promise<void>;
@@ -28,6 +29,9 @@ type AppState = {
   isDeviceOnline: (macAddress: string) => boolean;
   updateLiveStats: (deviceId: string, stats: Partial<LiveStats>) => void;
   getLiveStats: (deviceId: string) => LiveStats;
+  setSensorDataFromMqtt: (macAddress: string, data: MqttSensorData) => void;
+  setMqttConnectionStatus: (brokerUrl: string, status: MqttConnectionStatus) => void;
+  getMqttConnectionStatus: (brokerUrl: string) => MqttConnectionStatus;
 };
 
 const defaultStats: LiveStats = {
@@ -49,6 +53,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   devices: [],
   liveStats: {},
   devicePresence: {},
+  mqttConnectionStatus: {},
   hydrate: async () => {
     await initDatabase();
     const [config, devices] = await Promise.all([getConfig(), getDevices()]);
@@ -70,6 +75,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       devices: [],
       liveStats: {},
       devicePresence: {},
+      mqttConnectionStatus: {},
     });
   },
   addProvisionedDevice: async (input) => {
@@ -130,6 +136,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
   getLiveStats: (deviceId) => get().liveStats[deviceId] ?? defaultStats,
+  setSensorDataFromMqtt: (macAddress, data) => {
+    // 通过 MAC 地址查找设备 ID
+    const device = get().devices.find(
+      (d) => d.macAddress.toUpperCase() === macAddress.toUpperCase(),
+    );
+    if (!device) {
+      return;
+    }
+
+    set((state) => ({
+      liveStats: {
+        ...state.liveStats,
+        [device.id]: {
+          airTemp: data.temperature,
+          humidity: data.air_humidity,
+          soilMoisture: data.dirt_humidity,
+        },
+      },
+    }));
+  },
+  setMqttConnectionStatus: (brokerUrl, status) => {
+    set((state) => ({
+      mqttConnectionStatus: {
+        ...state.mqttConnectionStatus,
+        [brokerUrl]: status,
+      },
+    }));
+  },
+  getMqttConnectionStatus: (brokerUrl) => {
+    return get().mqttConnectionStatus[brokerUrl] ?? 'disconnected';
+  },
 }));
 
 function buildLiveStats(devices: Device[], existing: Record<string, LiveStats>) {

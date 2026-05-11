@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, IconButton, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, Chip, IconButton, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { issueDeviceCommand } from '@/lib/device-commands';
+import { connectToDevice, publishDeviceCommand } from '@/lib/mqtt-data';
 import { useAppStore } from '@/lib/store';
+import { toMqttWebSocketUrl } from '@/lib/mqtt-data';
 
 export default function DeviceDetailScreen() {
   const { deviceId } = useLocalSearchParams<{ deviceId: string }>();
   const devices = useAppStore((state) => state.devices);
   const getLiveStats = useAppStore((state) => state.getLiveStats);
-  const updateLiveStats = useAppStore((state) => state.updateLiveStats);
   const removeDevice = useAppStore((state) => state.removeDevice);
   const isDeviceOnline = useAppStore((state) => state.isDeviceOnline);
+  const getMqttConnectionStatus = useAppStore((state) => state.getMqttConnectionStatus);
 
   const [message, setMessage] = useState('');
 
@@ -23,21 +24,15 @@ export default function DeviceDetailScreen() {
   );
   const stats = getLiveStats(deviceId ?? '');
 
+  // 获取 MQTT 连接状态
+  const mqttStatus = device ? getMqttConnectionStatus(device.mqttUrl) : 'disconnected';
+
+  // 页面加载时自动连接 MQTT
   useEffect(() => {
-    if (!deviceId) {
-      return;
+    if (device && device.mqttUrl) {
+      connectToDevice(device);
     }
-
-    const timer = setInterval(() => {
-      updateLiveStats(deviceId, {
-        airTemp: Math.max(15, Math.min(35, stats.airTemp + (Math.random() - 0.5) * 0.8)),
-        humidity: Math.max(35, Math.min(90, stats.humidity + (Math.random() - 0.5) * 2)),
-        soilMoisture: Math.max(20, Math.min(95, stats.soilMoisture + (Math.random() - 0.5) * 1.4)),
-      });
-    }, 4500);
-
-    return () => clearInterval(timer);
-  }, [deviceId, stats.airTemp, stats.humidity, stats.soilMoisture, updateLiveStats]);
+  }, [device?.id, device?.mqttUrl]);
 
   if (!device) {
     return null;
@@ -45,11 +40,39 @@ export default function DeviceDetailScreen() {
 
   const online = isDeviceOnline(device.macAddress);
 
-  const runCommand = async (command: 'water' | 'light' | 'capture') => {
-    const result = await issueDeviceCommand(command, device.id, stats);
-    updateLiveStats(device.id, result.stats);
-    setMessage(result.message);
+  const runCommand = async (action: 'water' | 'capture') => {
+    const success = publishDeviceCommand(device, action);
+    if (success) {
+      setMessage(action === 'water' ? '浇水指令已发送' : '拍照指令已发送');
+    } else {
+      setMessage('指令发送失败，请检查 MQTT 连接');
+    }
   };
+
+  const handleReconnect = () => {
+    if (device.mqttUrl) {
+      connectToDevice(device);
+      setMessage('正在重新连接...');
+    } else {
+      setMessage('请先配置 MQTT 地址');
+    }
+  };
+
+  // 获取连接状态显示信息
+  const getMqttStatusInfo = () => {
+    switch (mqttStatus) {
+      case 'connected':
+        return { label: 'MQTT 已连接', color: '#1F7A37', bgColor: '#D9F4DE' };
+      case 'connecting':
+        return { label: 'MQTT 连接中...', color: '#9A4D00', bgColor: '#FFF4E8' };
+      case 'error':
+        return { label: 'MQTT 连接失败', color: '#B3261E', bgColor: '#FFF4F2' };
+      default:
+        return { label: 'MQTT 未连接', color: '#7A7268', bgColor: '#ECE7DD' };
+    }
+  };
+
+  const mqttStatusInfo = getMqttStatusInfo();
 
   const confirmDeleteDevice = () => {
     Alert.alert('删除设备', '删除后会同时移除该设备的本地手记记录，确认继续吗？', [
@@ -96,6 +119,21 @@ export default function DeviceDetailScreen() {
           <Text variant="bodyLarge" style={styles.subtitle}>
             设备地址：{device.macAddress}
           </Text>
+          <View style={styles.mqttStatusRow}>
+            <Chip
+              icon="connection"
+              compact
+              style={[styles.mqttStatusChip, { backgroundColor: mqttStatusInfo.bgColor }]}>
+              <Text style={{ color: mqttStatusInfo.color, fontSize: 12 }}>
+                {mqttStatusInfo.label}
+              </Text>
+            </Chip>
+            {mqttStatus !== 'connected' && mqttStatus !== 'connecting' && (
+              <Button mode="text" compact onPress={handleReconnect}>
+                重新连接
+              </Button>
+            )}
+          </View>
         </View>
 
         <Card style={styles.heroCard}>
@@ -112,9 +150,6 @@ export default function DeviceDetailScreen() {
             <View style={styles.buttonGrid}>
               <Button mode="contained" onPress={() => runCommand('water')}>
                 浇水
-              </Button>
-              <Button mode="contained-tonal" onPress={() => runCommand('light')}>
-                补光
               </Button>
               <Button mode="outlined" onPress={() => runCommand('capture')}>
                 立即拍照
@@ -241,5 +276,13 @@ const styles = StyleSheet.create({
   },
   buttonGrid: {
     gap: 12,
+  },
+  mqttStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mqttStatusChip: {
+    borderRadius: 8,
   },
 });

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
 import { disconnectPresenceClient, syncDevicePresence } from '@/lib/mqtt-presence';
+import { setSensorDataCallback, setConnectionStatusCallback, disconnectAllClients } from '@/lib/mqtt-data';
 import { useAppStore } from '@/lib/store';
 
 const plantTheme = {
@@ -31,11 +32,25 @@ function AppBootstrap() {
   const ready = useAppStore((state) => state.ready);
   const devices = useAppStore((state) => state.devices);
   const setDevicePresence = useAppStore((state) => state.setDevicePresence);
+  const setSensorDataFromMqtt = useAppStore((state) => state.setSensorDataFromMqtt);
+  const setMqttConnectionStatus = useAppStore((state) => state.setMqttConnectionStatus);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
 
+  // 设置 MQTT 回调函数
+  useEffect(() => {
+    setSensorDataCallback((macAddress, data) => {
+      setSensorDataFromMqtt(macAddress, data);
+    });
+
+    setConnectionStatusCallback((brokerUrl, status) => {
+      setMqttConnectionStatus(brokerUrl, status);
+    });
+  }, [setSensorDataFromMqtt, setMqttConnectionStatus]);
+
+  // MQTT 在线状态订阅
   useEffect(() => {
     if (!ready) {
       return;
