@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, IconButton, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { issueDeviceCommand } from '@/lib/device-commands';
@@ -12,6 +12,8 @@ export default function DeviceDetailScreen() {
   const devices = useAppStore((state) => state.devices);
   const getLiveStats = useAppStore((state) => state.getLiveStats);
   const updateLiveStats = useAppStore((state) => state.updateLiveStats);
+  const removeDevice = useAppStore((state) => state.removeDevice);
+  const isDeviceOnline = useAppStore((state) => state.isDeviceOnline);
 
   const [message, setMessage] = useState('');
 
@@ -41,19 +43,56 @@ export default function DeviceDetailScreen() {
     return null;
   }
 
+  const online = isDeviceOnline(device.macAddress);
+
   const runCommand = async (command: 'water' | 'light' | 'capture') => {
     const result = await issueDeviceCommand(command, device.id, stats);
     updateLiveStats(device.id, result.stats);
     setMessage(result.message);
   };
 
+  const confirmDeleteDevice = () => {
+    Alert.alert('删除设备', '删除后会同时移除该设备的本地手记记录，确认继续吗？', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: async () => {
+          await removeDevice(device.id);
+          router.back();
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text variant="headlineMedium" style={styles.title}>
-            {device.name}
-          </Text>
+          <View style={styles.headerRow}>
+            <View style={styles.titleRow}>
+              <Text variant="headlineMedium" style={styles.title}>
+                {device.name}
+              </Text>
+              <IconButton
+                icon="cog"
+                size={20}
+                mode="contained-tonal"
+                onPress={() =>
+                  router.push({
+                    pathname: '/device/[deviceId]/config',
+                    params: { deviceId: device.id },
+                  } as never)
+                }
+              />
+            </View>
+            <View
+              style={[styles.statusPill, { backgroundColor: online ? '#D9F4DE' : '#ECE7DD' }]}>
+              <Text variant="labelLarge" style={{ color: online ? '#1F7A37' : '#7A7268' }}>
+                {online ? 'Online' : 'Offline'}
+              </Text>
+            </View>
+          </View>
           <Text variant="bodyLarge" style={styles.subtitle}>
             设备地址：{device.macAddress}
           </Text>
@@ -102,6 +141,19 @@ export default function DeviceDetailScreen() {
             </Button>
           </Card.Content>
         </Card>
+
+        <Card style={styles.card}>
+          <Card.Content style={styles.section}>
+            <Text variant="titleMedium">设备管理</Text>
+            <Button
+              mode="outlined"
+              buttonColor="#FFF4F2"
+              textColor="#B3261E"
+              onPress={confirmDeleteDevice}>
+              删除设备
+            </Button>
+          </Card.Content>
+        </Card>
       </ScrollView>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
@@ -137,9 +189,26 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   title: {
     color: '#163020',
     fontWeight: '700',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   subtitle: {
     color: '#5E6859',
