@@ -9,6 +9,7 @@ import { useAppStore } from '@/lib/store';
 export default function DashboardScreen() {
   const devices = useAppStore((state) => state.devices);
   const getLiveStats = useAppStore((state) => state.getLiveStats);
+  const isDeviceOnline = useAppStore((state) => state.isDeviceOnline);
 
   const heroText = useMemo(() => {
     if (!devices.length) {
@@ -40,6 +41,7 @@ export default function DashboardScreen() {
 
         {devices.map((device) => {
           const stats = getLiveStats(device.id);
+          const online = isDeviceOnline(device.macAddress);
 
           return (
             <Card key={device.id} style={styles.card} mode="elevated">
@@ -51,8 +53,11 @@ export default function DashboardScreen() {
                       {device.macAddress}
                     </Text>
                   </View>
-                  <Chip icon="leaf" compact>
-                    在线
+                  <Chip
+                    icon="leaf"
+                    compact
+                    style={[styles.statusChip, { backgroundColor: online ? '#D9F4DE' : '#ECE7DD' }]}>
+                    {online ? 'Online' : 'Offline'}
                   </Chip>
                 </View>
 
@@ -151,6 +156,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  statusChip: {
+    borderRadius: 999,
   },
   subtle: {
     color: '#617062',

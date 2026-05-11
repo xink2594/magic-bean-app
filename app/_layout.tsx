@@ -6,6 +6,7 @@ import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
+import { disconnectPresenceClient, syncDevicePresence } from '@/lib/mqtt-presence';
 import { useAppStore } from '@/lib/store';
 
 const plantTheme = {
@@ -28,10 +29,32 @@ const plantTheme = {
 function AppBootstrap() {
   const hydrate = useAppStore((state) => state.hydrate);
   const ready = useAppStore((state) => state.ready);
+  const devices = useAppStore((state) => state.devices);
+  const setDevicePresence = useAppStore((state) => state.setDevicePresence);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+
+    const cleanup = syncDevicePresence({
+      devices,
+      onPresence: (macAddress, isOnline) => {
+        setDevicePresence(macAddress, isOnline);
+      },
+    });
+
+    return () => {
+      cleanup();
+      if (!devices.length) {
+        disconnectPresenceClient();
+      }
+    };
+  }, [devices, ready, setDevicePresence]);
 
   if (!ready) {
     return (
@@ -52,6 +75,7 @@ function AppBootstrap() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="provision" options={{ presentation: 'modal' }} />
       <Stack.Screen name="provision-portal" options={{ presentation: 'card' }} />
+      <Stack.Screen name="device/[deviceId]/config" options={{ presentation: 'modal' }} />
       <Stack.Screen name="device/[deviceId]" />
       <Stack.Screen name="device/[deviceId]/diary" />
       <Stack.Screen name="photo/[recordId]" options={{ presentation: 'card' }} />
