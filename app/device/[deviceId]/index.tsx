@@ -20,6 +20,7 @@ export default function DeviceDetailScreen() {
 
   const [message, setMessage] = useState('');
   const [historyData, setHistoryData] = useState<HistoryDataItem[]>([]);
+  const [selectedMetric, setSelectedMetric] = useState<'temp' | 'airHumidity' | 'soilHumidity'>('temp');
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
@@ -233,20 +234,29 @@ export default function DeviceDetailScreen() {
           <Card.Content style={styles.section}>
             <Text variant="titleMedium">历史趋势</Text>
 
-            {/* 图例 */}
-            <View style={styles.legendContainer}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#6A994E' }]} />
-                <Text variant="labelSmall" style={styles.legendText}>温度</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#5FA8D3' }]} />
-                <Text variant="labelSmall" style={styles.legendText}>空气湿度</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#E89B5C' }]} />
-                <Text variant="labelSmall" style={styles.legendText}>土壤湿度</Text>
-              </View>
+            {/* 指标选择按钮 */}
+            <View style={styles.metricButtons}>
+              <Chip
+                selected={selectedMetric === 'temp'}
+                onPress={() => setSelectedMetric('temp')}
+                style={[styles.metricChip, selectedMetric === 'temp' && { backgroundColor: '#D9F4DE' }]}
+                textStyle={selectedMetric === 'temp' ? { color: '#1F7A37' } : undefined}>
+                🌡️ 温度
+              </Chip>
+              <Chip
+                selected={selectedMetric === 'airHumidity'}
+                onPress={() => setSelectedMetric('airHumidity')}
+                style={[styles.metricChip, selectedMetric === 'airHumidity' && { backgroundColor: '#E3F2FD' }]}
+                textStyle={selectedMetric === 'airHumidity' ? { color: '#1565C0' } : undefined}>
+                💧 空气湿度
+              </Chip>
+              <Chip
+                selected={selectedMetric === 'soilHumidity'}
+                onPress={() => setSelectedMetric('soilHumidity')}
+                style={[styles.metricChip, selectedMetric === 'soilHumidity' && { backgroundColor: '#FFF3E0' }]}
+                textStyle={selectedMetric === 'soilHumidity' ? { color: '#E65100' } : undefined}>
+                🌱 土壤湿度
+              </Chip>
             </View>
 
             {/* 图表区域 */}
@@ -254,18 +264,12 @@ export default function DeviceDetailScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.chartContainer}>
                   <LineChart
-                    data={chartData.tempData}
-                    data2={chartData.airHumidityData}
-                    data3={chartData.soilHumidityData}
+                    data={selectedMetric === 'temp' ? chartData.tempData : selectedMetric === 'airHumidity' ? chartData.airHumidityData : chartData.soilHumidityData}
                     height={180}
                     width={Math.max(320, chartData.tempData.length * 50)}
-                    color1="#6A994E"
-                    color2="#5FA8D3"
-                    color3="#E89B5C"
+                    color={selectedMetric === 'temp' ? '#6A994E' : selectedMetric === 'airHumidity' ? '#5FA8D3' : '#E89B5C'}
                     thickness={2}
-                    dataPointsColor1="#6A994E"
-                    dataPointsColor2="#5FA8D3"
-                    dataPointsColor3="#E89B5C"
+                    dataPointsColor={selectedMetric === 'temp' ? '#6A994E' : selectedMetric === 'airHumidity' ? '#5FA8D3' : '#E89B5C'}
                     dataPointsRadius={4}
                     yAxisColor="#617062"
                     yAxisThickness={1}
@@ -275,7 +279,6 @@ export default function DeviceDetailScreen() {
                     xAxisLabelTextStyle={styles.axisLabel}
                     noOfSections={5}
                     maxValue={chartData.yAxisMax}
-                    minValue={chartData.yAxisMin}
                     spacing={40}
                     backgroundColor="transparent"
                     curved
@@ -461,23 +464,13 @@ const styles = StyleSheet.create({
   mqttStatusChip: {
     borderRadius: 8,
   },
-  legendContainer: {
+  metricButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    color: '#617062',
+  metricChip: {
+    backgroundColor: '#F5F1E8',
   },
   chartContainer: {
     paddingVertical: 10,
