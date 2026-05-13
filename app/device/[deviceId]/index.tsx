@@ -181,8 +181,8 @@ export default function DeviceDetailScreen() {
               />
             </View>
             <View
-              style={[styles.statusPill, { backgroundColor: online ? '#D9F4DE' : '#ECE7DD' }]}>
-              <Text variant="labelLarge" style={{ color: online ? '#1F7A37' : '#7A7268' }}>
+              style={[styles.statusPill, { backgroundColor: online ? '#D9F4DE' : '#FFEBEE' }]}>
+              <Text variant="labelLarge" style={{ color: online ? '#1F7A37' : '#C62828' }}>
                 {online ? 'Online' : 'Offline'}
               </Text>
             </View>
