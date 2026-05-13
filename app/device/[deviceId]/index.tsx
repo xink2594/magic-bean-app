@@ -132,16 +132,28 @@ export default function DeviceDetailScreen() {
       value: Number(item.dirtHumidity),
     }));
 
+    // 计算所有数据的最大值和最小值
+    const allValues = [
+      ...tempData.map(d => d.value),
+      ...airHumidityData.map(d => d.value),
+      ...soilHumidityData.map(d => d.value),
+    ];
+    const dataMin = Math.min(...allValues);
+    const dataMax = Math.max(...allValues);
+
+    // 动态计算 Y 轴范围（上下各留 10% 余量，最小不小于 0）
+    const padding = Math.max((dataMax - dataMin) * 0.1, 5);
+    const yAxisMin = Math.max(0, Math.floor((dataMin - padding) / 5) * 5);
+    const yAxisMax = Math.ceil((dataMax + padding) / 5) * 5;
+
     // 深拷贝避免冻结问题
     const result = {
       tempData: JSON.parse(JSON.stringify(tempData)),
       airHumidityData: JSON.parse(JSON.stringify(airHumidityData)),
       soilHumidityData: JSON.parse(JSON.stringify(soilHumidityData)),
+      yAxisMin,
+      yAxisMax,
     };
-
-    console.log('[Chart] tempData:', result.tempData);
-    console.log('[Chart] airHumidityData:', result.airHumidityData);
-    console.log('[Chart] soilHumidityData:', result.soilHumidityData);
 
     return result;
   }, [historyData]);
@@ -262,8 +274,8 @@ export default function DeviceDetailScreen() {
                     yAxisTextStyle={styles.axisLabel}
                     xAxisLabelTextStyle={styles.axisLabel}
                     noOfSections={5}
-                    maxValue={100}
-                    minValue={0}
+                    maxValue={chartData.yAxisMax}
+                    minValue={chartData.yAxisMin}
                     spacing={40}
                     backgroundColor="transparent"
                     curved
