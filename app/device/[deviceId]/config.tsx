@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, HelperText, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -41,79 +41,86 @@ export default function DeviceConfigScreen() {
 
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text variant="headlineMedium" style={styles.title}>
-            设备配置
-          </Text>
-          <Text variant="bodyLarge" style={styles.subtitle}>
-            {device.name} · {device.macAddress}
-          </Text>
-        </View>
-
-        <Card style={styles.card}>
-          <Card.Content style={styles.section}>
-            <Text variant="titleMedium">MQTT 地址</Text>
-            <TextInput
-              label="MQTT 地址"
-              value={mqttUrl}
-              onChangeText={setMqttUrl}
-              mode="outlined"
-              placeholder="mqtt://broker.example.com:1883"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Text variant="bodyMedium" style={styles.helper}>
-              支持 `mqtt://`、`mqtts://`、`ws://`、`wss://`。在线状态订阅会按这个地址建立连接。
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text variant="headlineMedium" style={styles.title}>
+              设备配置
             </Text>
-            <Text variant="titleMedium">在线状态订阅主题</Text>
-            <View style={styles.topicRow}>
+            <Text variant="bodyLarge" style={styles.subtitle}>
+              {device.name} · {device.macAddress}
+            </Text>
+          </View>
+
+          <Card style={styles.card}>
+            <Card.Content style={styles.section}>
+              <Text variant="titleMedium">MQTT 地址</Text>
               <TextInput
-                label="在线状态订阅主题"
-                value={mqttTopic}
-                onChangeText={setMqttTopic}
+                label="MQTT 地址"
+                value={mqttUrl}
+                onChangeText={setMqttUrl}
                 mode="outlined"
-                placeholder={`plant/${device.macAddress}/status`}
+                placeholder="mqtt://broker.example.com:1883"
                 autoCapitalize="none"
                 autoCorrect={false}
-                style={styles.topicInput}
               />
-              <Button
+              <Text variant="bodyMedium" style={styles.helper}>
+                支持 `mqtt://`、`mqtts://`、`ws://`、`wss://`。在线状态订阅会按这个地址建立连接。
+              </Text>
+              <Text variant="titleMedium">在线状态订阅主题</Text>
+              <View style={styles.topicRow}>
+                <TextInput
+                  label="在线状态订阅主题"
+                  value={mqttTopic}
+                  onChangeText={setMqttTopic}
+                  mode="outlined"
+                  placeholder={`plant/${device.macAddress}/status`}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  style={styles.topicInput}
+                />
+                <Button
+                  mode="outlined"
+                  compact
+                  onPress={() => setMqttTopic(`plant/${device.macAddress}/status`)}>
+                  默认
+                </Button>
+              </View>
+              <Text variant="bodyMedium" style={styles.helper}>
+                例如 `plant/AABBCCDDEEFF/status`。收到 `{"{"}"status":"online"{"}"}` 时会显示在线状态。
+              </Text>
+
+              <Text variant="titleMedium">自定义后端地址</Text>
+              <TextInput
+                label="后端地址"
+                value={backendUrl}
+                onChangeText={setBackendUrl}
                 mode="outlined"
-                compact
-                onPress={() => setMqttTopic(`plant/${device.macAddress}/status`)}>
-                默认
-              </Button>
-            </View>
-            <Text variant="bodyMedium" style={styles.helper}>
-              例如 `plant/AABBCCDDEEFF/status`。收到 `{"{"}"status":"online"{"}"}` 时会显示在线状态。
-            </Text>
+                placeholder="http://192.168.1.100:8080"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <HelperText type="info">
+                请填写完整的 URL，包含 http:// 或 https:// 前缀。例如 http://192.168.1.100:8080
+              </HelperText>
 
-            <Text variant="titleMedium">自定义后端地址</Text>
-            <TextInput
-              label="后端地址"
-              value={backendUrl}
-              onChangeText={setBackendUrl}
-              mode="outlined"
-              placeholder="http://192.168.1.100:8080"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <HelperText type="info">
-              请填写完整的 URL，包含 http:// 或 https:// 前缀。例如 http://192.168.1.100:8080
-            </HelperText>
-
-            <View style={styles.actions}>
-              <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>
-                保存配置
-              </Button>
-              <Button mode="text" onPress={() => router.back()}>
-                返回
-              </Button>
-            </View>
-          </Card.Content>
-        </Card>
-      </ScrollView>
+              <View style={styles.actions}>
+                <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>
+                  保存配置
+                </Button>
+                <Button mode="text" onPress={() => router.back()}>
+                  返回
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
         {message}
@@ -127,9 +134,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F1E8',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   content: {
     padding: 20,
     gap: 18,
+    paddingBottom: 40,
   },
   header: {
     gap: 8,
