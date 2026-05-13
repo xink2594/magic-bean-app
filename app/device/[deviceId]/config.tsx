@@ -95,11 +95,13 @@ export default function DeviceConfigScreen() {
               value={backendUrl}
               onChangeText={setBackendUrl}
               mode="outlined"
-              placeholder="https://api.example.com"
+              placeholder="http://192.168.1.100:8080"
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <HelperText type="info">该设备的 AI 诊断与同步请求会优先使用此地址。</HelperText>
+            <HelperText type="info">
+              请填写完整的 URL，包含 http:// 或 https:// 前缀。例如 http://192.168.1.100:8080
+            </HelperText>
 
             <View style={styles.actions}>
               <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>

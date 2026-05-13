@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Chip, IconButton, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LineChart } from 'react-native-gifted-charts';
 
+import { fetchHistoryData } from '@/lib/api';
 import { connectToDevice, publishDeviceCommand } from '@/lib/mqtt-data';
 import { useAppStore } from '@/lib/store';
-import { toMqttWebSocketUrl } from '@/lib/mqtt-data';
+import { HistoryDataItem } from '@/lib/types';
 
 export default function DeviceDetailScreen() {
   const { deviceId } = useLocalSearchParams<{ deviceId: string }>();
@@ -17,6 +19,7 @@ export default function DeviceDetailScreen() {
   const getMqttConnectionStatus = useAppStore((state) => state.getMqttConnectionStatus);
 
   const [message, setMessage] = useState('');
+  const [historyData, setHistoryData] = useState<HistoryDataItem[]>([]);
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
@@ -27,12 +30,22 @@ export default function DeviceDetailScreen() {
   // 获取 MQTT 连接状态
   const mqttStatus = device ? getMqttConnectionStatus(device.mqttUrl) : 'disconnected';
 
-  // 页面加载时自动连接 MQTT
+  // 获取历史数据
+  const loadHistoryData = useCallback(async () => {
+    if (!device?.macAddress) return;
+    const result = await fetchHistoryData(device.macAddress, device.backendUrl);
+    if (result?.records) {
+      setHistoryData(result.records);
+    }
+  }, [device?.macAddress, device?.backendUrl]);
+
+  // 页面加载时自动连接 MQTT 并获取历史数据
   useEffect(() => {
     if (device && device.mqttUrl) {
       connectToDevice(device);
     }
-  }, [device?.id, device?.mqttUrl]);
+    loadHistoryData();
+  }, [device?.id, device?.mqttUrl, loadHistoryData]);
 
   if (!device) {
     return null;
@@ -88,6 +101,38 @@ export default function DeviceDetailScreen() {
     ]);
   };
 
+  // 准备图表数据
+  const chartData = useMemo(() => {
+    if (historyData.length === 0) return null;
+
+    // 取最近的 12 条数据
+    const recentData = historyData.slice(-12);
+
+    const formatLabel = (timestamp: number) => {
+      const date = new Date(timestamp * 1000);
+      return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+    };
+
+    // 温度数据（左轴）
+    const tempData = recentData.map((item) => ({
+      value: item.temperature,
+      label: formatLabel(item.timestamp),
+      labelTextStyle: styles.axisLabel,
+    }));
+
+    // 空气湿度数据（右轴）
+    const airHumidityData = recentData.map((item) => ({
+      value: item.airHumidity,
+    }));
+
+    // 土壤湿度数据（右轴）
+    const soilHumidityData = recentData.map((item) => ({
+      value: item.dirtHumidity,
+    }));
+
+    return { tempData, airHumidityData, soilHumidityData };
+  }, [historyData]);
+
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -138,23 +183,95 @@ export default function DeviceDetailScreen() {
 
         <Card style={styles.heroCard}>
           <Card.Content style={styles.heroContent}>
-            <Metric
-              label="空气温度"
-              value={stats.airTemp !== null ? `${stats.airTemp.toFixed(1)}°C` : '--'}
-              accent="#E89B5C"
-            />
-            <Metric
-              label="空气湿度"
-              value={stats.humidity !== null ? `${stats.humidity.toFixed(0)}%` : '--'}
-              accent="#5FA8D3"
-            />
-            <Metric
-              label="土壤湿度"
-              value={stats.soilMoisture !== null ? `${stats.soilMoisture.toFixed(0)}%` : '--'}
-              accent="#6A994E"
-            />
+            <View style={styles.currentStats}>
+              <Metric
+                label="空气温度"
+                value={stats.airTemp !== null ? `${stats.airTemp.toFixed(1)}°C` : '--'}
+                accent="#E89B5C"
+              />
+              <Metric
+                label="空气湿度"
+                value={stats.humidity !== null ? `${stats.humidity.toFixed(0)}%` : '--'}
+                accent="#5FA8D3"
+              />
+              <Metric
+                label="土壤湿度"
+                value={stats.soilMoisture !== null ? `${stats.soilMoisture.toFixed(0)}%` : '--'}
+                accent="#6A994E"
+              />
+            </View>
           </Card.Content>
         </Card>
+
+        {chartData && (
+          <Card style={styles.card}>
+            <Card.Content style={styles.section}>
+              <Text variant="titleMedium">历史趋势</Text>
+
+              {/* 图例 */}
+              <View style={styles.legendContainer}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#E89B5C' }]} />
+                  <Text variant="labelSmall" style={styles.legendText}>温度 (左轴)</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#5FA8D3' }]} />
+                  <Text variant="labelSmall" style={styles.legendText}>空气湿度 (右轴)</Text>
+                </View>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: '#6A994E' }]} />
+                  <Text variant="labelSmall" style={styles.legendText}>土壤湿度 (右轴)</Text>
+                </View>
+              </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.chartContainer}>
+                  <LineChart
+                    data={chartData.tempData}
+                    data2={chartData.airHumidityData}
+                    data3={chartData.soilHumidityData}
+                    height={180}
+                    width={Math.max(320, chartData.tempData.length * 45)}
+                    color1="#E89B5C"
+                    color2="#5FA8D3"
+                    color3="#6A994E"
+                    thickness1={2}
+                    thickness2={2}
+                    thickness3={2}
+                    dataPointsColor1="#E89B5C"
+                    dataPointsColor2="#5FA8D3"
+                    dataPointsColor3="#6A994E"
+                    dataPointsRadius={3}
+                    hideDataPoints={false}
+                    yAxisColor="#617062"
+                    yAxisThickness={1}
+                    xAxisColor="#617062"
+                    xAxisThickness={1}
+                    yAxisTextStyle={styles.axisLabel}
+                    xAxisLabelTextStyle={styles.axisLabel}
+                    noOfSections={4}
+                    spacing={30}
+                    backgroundColor="transparent"
+                    curved
+                    isAnimated
+                    showValuesAsDataPointsText={false}
+                    yAxisLabelTexts={generateYAxisLabels(chartData.tempData, 0, 50)}
+                    secondaryYAxis={{
+                      yAxisColor: '#617062',
+                      yAxisThickness: 1,
+                      yAxisTextStyle: styles.axisLabel,
+                      noOfSections: 4,
+                      yAxisLabelTexts: generateYAxisLabels(chartData.airHumidityData, 0, 100),
+                    }}
+                  />
+                </View>
+              </ScrollView>
+              <Text variant="bodySmall" style={styles.chartHint}>
+                显示最近 {chartData.tempData.length} 条记录
+              </Text>
+            </Card.Content>
+          </Card>
+        )}
 
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
@@ -208,6 +325,17 @@ export default function DeviceDetailScreen() {
       </Snackbar>
     </SafeAreaView>
   );
+}
+
+// 生成 Y 轴标签
+function generateYAxisLabels(data: { value: number }[], min: number, max: number): string[] {
+  const sections = 4;
+  const labels: string[] = [];
+  for (let i = sections; i >= 0; i--) {
+    const value = min + ((max - min) * i) / sections;
+    labels.push(Math.round(value).toString());
+  }
+  return labels;
 }
 
 function Metric({ label, value, accent }: { label: string; value: string; accent: string }) {
@@ -266,6 +394,9 @@ const styles = StyleSheet.create({
   heroContent: {
     gap: 14,
   },
+  currentStats: {
+    gap: 10,
+  },
   metric: {
     backgroundColor: '#FCFBF7',
     borderRadius: 22,
@@ -296,5 +427,34 @@ const styles = StyleSheet.create({
   },
   mqttStatusChip: {
     borderRadius: 8,
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendText: {
+    color: '#617062',
+  },
+  chartContainer: {
+    paddingVertical: 10,
+  },
+  chartHint: {
+    color: '#617062',
+    textAlign: 'center',
+  },
+  axisLabel: {
+    color: '#617062',
+    fontSize: 10,
   },
 });

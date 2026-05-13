@@ -1,22 +1,12 @@
 import axios from 'axios';
 
 import { DEMO_AI_DIAGNOSIS } from '@/lib/demo-content';
-import { DeviceLatestData, DiaryListResponse, PlantRecord } from '@/lib/types';
+import { DeviceLatestData, DiaryListResponse, HistoryDataResponse, PlantRecord } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
-
-// 确保 URL 有协议前缀
-function ensureProtocol(url: string): string {
-  if (!url) return '';
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
-  }
-  return `http://${url}`;
-}
 
 // 获取全局后端地址
 function getGlobalBackendUrl(): string {
-  const url = useAppStore.getState().config.backendUrl || '192.168.123.160:8080';
-  return ensureProtocol(url);
+  return useAppStore.getState().config.backendUrl || 'http://192.168.123.160:8080';
 }
 
 export const api = axios.create({
@@ -32,7 +22,7 @@ api.interceptors.request.use((config) => {
 // 创建独立的设备 API 客户端（使用设备自己的后端地址）
 function createDeviceApi(backendUrl: string) {
   return axios.create({
-    baseURL: ensureProtocol(backendUrl),
+    baseURL: backendUrl,
     timeout: 10000,
   });
 }
@@ -148,6 +138,27 @@ export async function fetchDiaryList(
     return null;
   } catch (error) {
     console.error('[API] fetchDiaryList error:', error);
+    return null;
+  }
+}
+
+// 获取设备历史数据
+export async function fetchHistoryData(
+  deviceId: string,
+  deviceBackendUrl?: string,
+): Promise<HistoryDataResponse | null> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const url = `/api/data/history?deviceId=${deviceId}`;
+    const response = await client.get<ApiResponse<HistoryDataResponse>>(url);
+
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[API] fetchHistoryData error:', error);
     return null;
   }
 }

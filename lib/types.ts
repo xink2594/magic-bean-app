@@ -84,3 +84,17 @@ export type DiaryListResponse = {
   pageSize?: number;
   total?: number;
 };
+
+// 历史数据项
+export type HistoryDataItem = {
+  id: number;
+  timestamp: number;
+  temperature: number;
+  airHumidity: number;
+  dirtHumidity: number;
+};
+
+// 历史数据响应
+export type HistoryDataResponse = {
+  records: HistoryDataItem[];
+};
