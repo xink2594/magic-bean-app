@@ -171,6 +171,36 @@ export async function fetchHistoryData(
   }
 }
 
+// AI 分析植物图片
+export async function analyzePlantImage(
+  imageUrl: string,
+  deviceBackendUrl?: string,
+): Promise<string | null> {
+  const prompt = `你是一位资深的植物病理学家和高级园艺师。你的任务是根据用户提供的植物照片，结合当前的环境传感器数据（如果有），对植物的健康状况进行精准诊断。
+
+请你保持专业、严谨且易于理解的语气。在分析时，请密切关注叶片颜色（发黄、焦枯）、斑点、萎蔫下垂、徒长以及土壤表面的状态。
+
+请务必严格按照以下固定的格式输出结果，不要生成任何无关的闲聊和前言后语：
+
+植物品种：[尽可能准确地识别植物的俗名，若不确定请说明最可能的科属]
+长势分析：[详细描述图片中观察到的植物状态。指出任何异常症状，如缺水、烂根、虫害、缺素或日灼，并结合传入的环境温湿度数据解释原因]
+培养建议：[给出不少于3条的具体、可操作的养护建议，需涵盖水分管理、光照调节、施肥或病虫害防治等方面，步骤要求明确]`;
+
+  try {
+    const client = getClient(deviceBackendUrl);
+    const response = await client.post('/api/ai/analyze', { imageUrl, prompt });
+
+    if (response.data.code === 200) {
+      return response.data.data ?? response.data.result ?? response.data.analysis ?? '分析完成';
+    }
+
+    return response.data.msg ?? '分析失败';
+  } catch (error) {
+    console.error('[API] analyzePlantImage error:', error);
+    return null;
+  }
+}
+
 // 获取日记详情
 export async function fetchDiaryDetail(
   deviceId: string,

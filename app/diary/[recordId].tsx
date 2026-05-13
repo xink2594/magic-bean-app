@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, IconButton, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Divider, IconButton, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
-import { deleteDiary, fetchDiaryDetail, saveDiaryNote } from '@/lib/api';
+import { analyzePlantImage, deleteDiary, fetchDiaryDetail, saveDiaryNote } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { DiaryDetail } from '@/lib/types';
 
@@ -17,6 +17,8 @@ export default function DiaryDetailScreen() {
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
   const device = useMemo(
@@ -54,6 +56,21 @@ export default function DiaryDetailScreen() {
       setMessage('备注已保存');
     } else {
       setMessage('保存失败，请重试');
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!detail) return;
+
+    setAnalyzing(true);
+    setAiResult(null);
+    const result = await analyzePlantImage(detail.imageUrl, device?.backendUrl);
+    setAnalyzing(false);
+
+    if (result) {
+      setAiResult(result);
+    } else {
+      setMessage('AI 分析失败，请重试');
     }
   };
 
@@ -200,6 +217,31 @@ export default function DiaryDetailScreen() {
             </Card.Content>
           </Card>
 
+          {/* AI 分析 */}
+          <Card style={styles.card}>
+            <Card.Content style={styles.aiContent}>
+              <Text variant="titleMedium">AI 植物诊断</Text>
+              <Button
+                mode="contained"
+                icon="robot"
+                onPress={handleAnalyze}
+                loading={analyzing}
+                disabled={analyzing}
+                style={styles.aiButton}>
+                AI 分析
+              </Button>
+
+              {aiResult && (
+                <View style={styles.aiResultContainer}>
+                  <Divider style={styles.divider} />
+                  <Text variant="bodyMedium" style={styles.aiResultText}>
+                    {aiResult}
+                  </Text>
+                </View>
+              )}
+            </Card.Content>
+          </Card>
+
           {/* 删除按钮 */}
           <Button
             mode="outlined"
@@ -292,6 +334,22 @@ const styles = StyleSheet.create({
   },
   noteInput: {
     backgroundColor: '#FFFDF8',
+  },
+  aiContent: {
+    gap: 12,
+  },
+  aiButton: {
+    backgroundColor: '#254D32',
+  },
+  aiResultContainer: {
+    gap: 12,
+  },
+  divider: {
+    backgroundColor: '#E5E1D8',
+  },
+  aiResultText: {
+    color: '#163020',
+    lineHeight: 22,
   },
   deleteButton: {
     marginTop: 8,
