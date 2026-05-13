@@ -62,10 +62,12 @@ export default function ProvisionPortalScreen() {
 
       setSaving(true);
       const macAddress = payload.mac || ssid;
+      // 将 broker 地址转换为 ws://{broker}:8083/mqtt
+      const mqttUrl = payload.mqtt ? `ws://${payload.mqtt}:8083/mqtt` : '';
       await addProvisionedDevice({
         macAddress,
         name: (deviceName || macAddress).trim(),
-        mqttUrl: payload.mqtt || '',
+        mqttUrl,
         mqttTopic: `plant/${macAddress}/status`,
       });
       setSaving(false);
