@@ -171,32 +171,64 @@ export async function fetchHistoryData(
   }
 }
 
+// AI 分析结果类型
+export type AiAnalysisResult = {
+  species: string;
+  analysis: string;
+  suggestions: string[];
+};
+
 // AI 分析植物图片
 export async function analyzePlantImage(
   imageUrl: string,
+  temperature?: number | null,
+  airHumidity?: number | null,
+  dirtHumidity?: number | null,
   deviceBackendUrl?: string,
-): Promise<string | null> {
-  const prompt = `你是一位资深的植物病理学家和高级园艺师。你的任务是根据用户提供的植物照片，结合当前的环境传感器数据（如果有），对植物的健康状况进行精准诊断。
-
-请你保持专业、严谨且易于理解的语气。在分析时，请密切关注叶片颜色（发黄、焦枯）、斑点、萎蔫下垂、徒长以及土壤表面的状态。
-
-请务必严格按照以下固定的格式输出结果，不要生成任何无关的闲聊和前言后语：
-
-植物品种：[尽可能准确地识别植物的俗名，若不确定请说明最可能的科属]
-长势分析：[详细描述图片中观察到的植物状态。指出任何异常症状，如缺水、烂根、虫害、缺素或日灼，并结合传入的环境温湿度数据解释原因]
-培养建议：[给出不少于3条的具体、可操作的养护建议，需涵盖水分管理、光照调节、施肥或病虫害防治等方面，步骤要求明确]`;
-
+): Promise<AiAnalysisResult | null> {
+  // const prompt = '你是一位资深的植物病理学家和高级园艺师。你的任务是根据植物照片和传感器数据，诊断植物健康状况。输入的环境数据参考（可能为空）：当前温度：' + (temperature ?? '无') + '℃，空气湿度：' + (airHumidity ?? '无') + '%，土壤湿度：' + (dirtHumidity ?? '无') + '%。请严格以合法的 JSON 格式输出你的诊断结果，只输出 JSON 字符串，不要包含任何 Markdown 标记（如 ```json）和其他解释性文字。JSON 结构如下：{"species":"植物的俗名或学名","analysis":"结合图片和环境数据，详细描述植物当前长势、病害或异常原因的分析过程。","suggestions":["具体的浇水/土壤管理建议","具体的光照/温度调整建议","施肥或病虫害处理建议"]}';
+  const prompt = ''
+  
   try {
-    const client = getClient(deviceBackendUrl);
-    const response = await client.post('/api/ai/analyze', { imageUrl, prompt });
+    // AI 分析可能需要更长时间，使用更长的超时
+    const client = axios.create({
+      baseURL: deviceBackendUrl?.trim() || getGlobalBackendUrl(),
+      timeout: 60000, // 60秒超时
+    });
 
-    if (response.data.code === 200) {
-      return response.data.data ?? response.data.result ?? response.data.analysis ?? '分析完成';
+    console.log('[API] analyzePlantImage baseURL:', client.defaults.baseURL);
+
+    const requestBody = { imageUrl, prompt };
+    console.log('[API] analyzePlantImage request body length:', JSON.stringify(requestBody).length);
+
+    const response = await client.post('/api/ai/analyze', requestBody);
+
+    const responseData = response.data;
+
+    // 后端返回格式：
+    // { code: 200, data: { plantVariety, growthAnalysis, cultivationAdvice } }
+    if (responseData?.code === 200 && responseData?.data) {
+      const data = responseData.data;
+
+      // 将 cultivationAdvice 按分号分割成建议数组
+      const adviceText = data.cultivationAdvice ?? '';
+      const suggestions = adviceText
+        .split(/[；]/)
+        .map((s: string) => s.replace(/^\d+[.、]/, '').trim())  // 移除开头的数字和标点
+        .filter((s: string) => s.length > 0);
+
+      return {
+        species: data.plantVariety ?? '未知',
+        analysis: data.growthAnalysis ?? '',
+        suggestions,
+      } as AiAnalysisResult;
     }
 
-    return response.data.msg ?? '分析失败';
-  } catch (error) {
-    console.error('[API] analyzePlantImage error:', error);
+    return null;
+  } catch (error: any) {
+    console.error('[API] analyzePlantImage error:', error?.message);
+    console.error('[API] analyzePlantImage error code:', error?.code);
+    console.error('[API] analyzePlantImage error config:', error?.config?.baseURL, error?.config?.url);
     return null;
   }
 }

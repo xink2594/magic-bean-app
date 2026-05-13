@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Divider, IconButton, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Dialog, Divider, IconButton, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
-import { analyzePlantImage, deleteDiary, fetchDiaryDetail, saveDiaryNote } from '@/lib/api';
+import { AiAnalysisResult, analyzePlantImage, deleteDiary, fetchDiaryDetail, saveDiaryNote } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { DiaryDetail } from '@/lib/types';
 
@@ -18,7 +18,8 @@ export default function DiaryDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<AiAnalysisResult | null>(null);
+  const [showAiDialog, setShowAiDialog] = useState(false);
   const [message, setMessage] = useState('');
 
   const device = useMemo(
@@ -64,11 +65,20 @@ export default function DiaryDetailScreen() {
 
     setAnalyzing(true);
     setAiResult(null);
-    const result = await analyzePlantImage(detail.imageUrl, device?.backendUrl);
+
+    const result = await analyzePlantImage(
+      detail.imageUrl,
+      detail.temperature,
+      detail.airHumidity,
+      detail.dirtHumidity,
+      device?.backendUrl,
+    );
+
     setAnalyzing(false);
 
     if (result) {
       setAiResult(result);
+      setShowAiDialog(true);
     } else {
       setMessage('AI 分析失败，请重试');
     }
@@ -230,15 +240,6 @@ export default function DiaryDetailScreen() {
                 style={styles.aiButton}>
                 AI 分析
               </Button>
-
-              {aiResult && (
-                <View style={styles.aiResultContainer}>
-                  <Divider style={styles.divider} />
-                  <Text variant="bodyMedium" style={styles.aiResultText}>
-                    {aiResult}
-                  </Text>
-                </View>
-              )}
             </Card.Content>
           </Card>
 
@@ -253,6 +254,47 @@ export default function DiaryDetailScreen() {
           </Button>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* AI 分析结果对话框 */}
+      <Portal>
+        <Dialog visible={showAiDialog} onDismiss={() => setShowAiDialog(false)} style={styles.dialog}>
+          <Dialog.Title>🤖 AI 诊断结果</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView style={styles.dialogBody}>
+              {aiResult && (
+                <>
+                  <View style={styles.resultSection}>
+                    <Text variant="titleMedium" style={styles.resultLabel}>🌿 植物品种</Text>
+                    <Text variant="bodyLarge" style={styles.resultValue}>{aiResult.species}</Text>
+                  </View>
+
+                  <Divider style={styles.divider} />
+
+                  <View style={styles.resultSection}>
+                    <Text variant="titleMedium" style={styles.resultLabel}>📊 长势分析</Text>
+                    <Text variant="bodyMedium" style={styles.resultText}>{aiResult.analysis}</Text>
+                  </View>
+
+                  <Divider style={styles.divider} />
+
+                  <View style={styles.resultSection}>
+                    <Text variant="titleMedium" style={styles.resultLabel}>💡 培养建议</Text>
+                    {aiResult.suggestions.map((suggestion, index) => (
+                      <View key={index} style={styles.suggestionItem}>
+                        <Text variant="bodyMedium" style={styles.suggestionNumber}>{index + 1}.</Text>
+                        <Text variant="bodyMedium" style={styles.suggestionText}>{suggestion}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setShowAiDialog(false)}>关闭</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
         {message}
@@ -341,17 +383,48 @@ const styles = StyleSheet.create({
   aiButton: {
     backgroundColor: '#254D32',
   },
-  aiResultContainer: {
-    gap: 12,
-  },
   divider: {
     backgroundColor: '#E5E1D8',
-  },
-  aiResultText: {
-    color: '#163020',
-    lineHeight: 22,
+    marginVertical: 12,
   },
   deleteButton: {
     marginTop: 8,
+  },
+  // 对话框样式
+  dialog: {
+    backgroundColor: '#FFFDF8',
+    maxHeight: '70%',
+  },
+  dialogBody: {
+    paddingHorizontal: 24,
+  },
+  resultSection: {
+    gap: 8,
+  },
+  resultLabel: {
+    color: '#617062',
+    fontWeight: '600',
+  },
+  resultValue: {
+    color: '#163020',
+    fontWeight: '700',
+  },
+  resultText: {
+    color: '#163020',
+    lineHeight: 22,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  suggestionNumber: {
+    color: '#254D32',
+    fontWeight: '700',
+  },
+  suggestionText: {
+    color: '#163020',
+    flex: 1,
+    lineHeight: 22,
   },
 });
