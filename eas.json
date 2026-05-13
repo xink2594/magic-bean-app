@@ -6,12 +6,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "applicationIdSuffix": ".develop"
+      },
+      "env": {
+        "APP_DISPLAY_NAME": "Magic Bean Dev"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "applicationIdSuffix": ".preview"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "APP_DISPLAY_NAME": "Magic Bean Preview"
       }
     },
     "production": {
