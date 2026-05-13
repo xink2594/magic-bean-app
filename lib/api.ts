@@ -171,6 +171,25 @@ export async function fetchHistoryData(
   }
 }
 
+// 测试后端连接
+export async function testBackendConnection(backendUrl: string): Promise<boolean> {
+  if (!backendUrl?.trim()) {
+    return false;
+  }
+
+  try {
+    const client = axios.create({
+      baseURL: backendUrl.trim(),
+      timeout: 5000,
+    });
+
+    const response = await client.get('/');
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
+
 // AI 分析结果类型
 export type AiAnalysisResult = {
   species: string;

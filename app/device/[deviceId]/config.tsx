@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, HelperText, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { testBackendConnection } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 
 export default function DeviceConfigScreen() {
@@ -20,12 +21,15 @@ export default function DeviceConfigScreen() {
   const [mqttTopic, setMqttTopic] = useState(device?.mqttTopic ?? '');
   const [backendUrl, setBackendUrl] = useState(device?.backendUrl ?? '');
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<boolean | null>(null);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     setMqttUrl(device?.mqttUrl ?? '');
     setMqttTopic(device?.mqttTopic ?? '');
     setBackendUrl(device?.backendUrl ?? '');
+    setConnectionStatus(null);
   }, [device?.mqttTopic, device?.mqttUrl, device?.backendUrl]);
 
   if (!device) {
@@ -37,6 +41,20 @@ export default function DeviceConfigScreen() {
     await saveDeviceMqttConfig(device.id, mqttUrl.trim(), mqttTopic.trim(), backendUrl.trim());
     setSaving(false);
     setMessage('设备配置已保存。');
+  };
+
+  const onTestConnection = async () => {
+    if (!backendUrl.trim()) {
+      setMessage('请先填写后端地址');
+      return;
+    }
+
+    setTesting(true);
+    setConnectionStatus(null);
+    const success = await testBackendConnection(backendUrl);
+    setConnectionStatus(success);
+    setTesting(false);
+    setMessage(success ? '连接成功！' : '连接失败，请检查地址是否正确');
   };
 
   return (
@@ -105,6 +123,22 @@ export default function DeviceConfigScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
+              <View style={styles.testRow}>
+                <Button
+                  mode="outlined"
+                  compact
+                  onPress={onTestConnection}
+                  loading={testing}
+                  disabled={testing || !backendUrl.trim()}>
+                  测试连接
+                </Button>
+                {connectionStatus !== null && (
+                  <View style={[
+                    styles.statusDot,
+                    { backgroundColor: connectionStatus ? '#4CAF50' : '#F44336' }
+                  ]} />
+                )}
+              </View>
               <HelperText type="info">
                 请填写完整的 URL，包含 http:// 或 https:// 前缀。例如 http://192.168.1.100:8080
               </HelperText>
@@ -162,6 +196,16 @@ const styles = StyleSheet.create({
   helper: {
     color: '#617062',
     lineHeight: 20,
+  },
+  testRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   actions: {
     flexDirection: 'row',
