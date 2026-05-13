@@ -5,7 +5,7 @@ import { AppConfig, Device, PlantRecord } from "@/lib/types";
 const databasePromise = SQLite.openDatabaseAsync("magic-bean.db");
 
 const defaultConfig: AppConfig = {
-  backendUrl: "https://plant-proxy.local",
+  backendUrl: "http://192.168.123.160:8080",
   llmStatus: "离线",
   webdavUrl: "https://storage.local/webdav/plants/",
   syncEnabled: false,

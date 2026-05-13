@@ -1,15 +1,21 @@
-import { useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Card, Chip, FAB, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { fetchDeviceLatestData } from '@/lib/api';
+import { DeviceLatestData } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 
 export default function DashboardScreen() {
   const devices = useAppStore((state) => state.devices);
   const getLiveStats = useAppStore((state) => state.getLiveStats);
   const isDeviceOnline = useAppStore((state) => state.isDeviceOnline);
+  const updateLiveStats = useAppStore((state) => state.updateLiveStats);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [apiData, setApiData] = useState<Record<string, DeviceLatestData>>({});
 
   const heroText = useMemo(() => {
     if (!devices.length) {
@@ -19,9 +25,49 @@ export default function DashboardScreen() {
     return `已连接 ${devices.length} 台花盆设备，随时可以进行本地同步。`;
   }, [devices.length]);
 
+  const fetchData = useCallback(async () => {
+    if (!devices.length) return;
+
+    const results = await Promise.all(
+      devices.map(async (device) => {
+        const data = await fetchDeviceLatestData(device.macAddress, device.backendUrl);
+        return { deviceId: device.id, data };
+      }),
+    );
+
+    const newApiData: Record<string, DeviceLatestData> = {};
+    for (const { deviceId, data } of results) {
+      if (data?.latestData) {
+        newApiData[deviceId] = data;
+        updateLiveStats(deviceId, {
+          airTemp: data.latestData.temperature ?? 0,
+          humidity: data.latestData.airHumidity ?? 0,
+          soilMoisture: data.latestData.dirtHumidity ?? 0,
+        });
+      }
+    }
+
+    setApiData(newApiData);
+  }, [devices, updateLiveStats]);
+
+  // 进入页面时自动加载
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
+
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#254D32" />
+        }>
         <View style={styles.hero}>
           <Text variant="headlineMedium" style={styles.heroTitle}>
             智能植物控制台
@@ -42,6 +88,8 @@ export default function DashboardScreen() {
         {devices.map((device) => {
           const stats = getLiveStats(device.id);
           const online = isDeviceOnline(device.macAddress);
+          const latestData = apiData[device.id];
+          const hasApiData = Boolean(latestData);
 
           return (
             <Card key={device.id} style={styles.card} mode="elevated">
@@ -53,18 +101,34 @@ export default function DashboardScreen() {
                       {device.macAddress}
                     </Text>
                   </View>
-                  <Chip
-                    icon="leaf"
-                    compact
-                    style={[styles.statusChip, { backgroundColor: online ? '#D9F4DE' : '#ECE7DD' }]}>
-                    {online ? 'Online' : 'Offline'}
-                  </Chip>
+                  <View style={styles.chipGroup}>
+                    {hasApiData && (
+                      <Chip icon="cloud-check" compact style={styles.apiChip}>
+                        API
+                      </Chip>
+                    )}
+                    <Chip
+                      icon="leaf"
+                      compact
+                      style={[styles.statusChip, { backgroundColor: online ? '#D9F4DE' : '#ECE7DD' }]}>
+                      {online ? 'Online' : 'Offline'}
+                    </Chip>
+                  </View>
                 </View>
 
                 <View style={styles.metricRow}>
-                  <Metric label="空气温度" value={`${stats.airTemp.toFixed(1)}°C`} />
-                  <Metric label="空气湿度" value={`${stats.humidity.toFixed(0)}%`} />
-                  <Metric label="土壤湿度" value={`${stats.soilMoisture.toFixed(0)}%`} />
+                  <Metric
+                    label="空气温度"
+                    value={stats.airTemp !== null ? `${stats.airTemp.toFixed(1)}°C` : '--'}
+                  />
+                  <Metric
+                    label="空气湿度"
+                    value={stats.humidity !== null ? `${stats.humidity.toFixed(0)}%` : '--'}
+                  />
+                  <Metric
+                    label="土壤湿度"
+                    value={stats.soilMoisture !== null ? `${stats.soilMoisture.toFixed(0)}%` : '--'}
+                  />
                 </View>
 
                 <View style={styles.actionRow}>
@@ -156,6 +220,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  chipGroup: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  apiChip: {
+    borderRadius: 999,
+    backgroundColor: '#E3F2FD',
   },
   statusChip: {
     borderRadius: 999,

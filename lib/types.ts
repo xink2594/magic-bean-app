@@ -26,9 +26,9 @@ export type AppConfig = {
 };
 
 export type LiveStats = {
-  airTemp: number;
-  humidity: number;
-  soilMoisture: number;
+  airTemp: number | null;
+  humidity: number | null;
+  soilMoisture: number | null;
 };
 
 // MQTT 传感器数据 payload 格式
@@ -57,4 +57,30 @@ export type DeviceLastCommand = {
   action: string;
   timestamp: number;
   msgId: string;
+};
+
+// 设备最新数据（从 API 获取）
+export type DeviceLatestData = {
+  deviceId?: string;
+  status?: string;
+  latestData?: {
+    timestamp?: number;
+    temperature?: number;
+    airHumidity?: number;
+    dirtHumidity?: number;
+  };
+};
+
+// 日记列表项（从 API 获取）
+export type DiaryListItem = {
+  id: number;
+  imageUrl: string;
+};
+
+// 日记列表响应
+export type DiaryListResponse = {
+  records: DiaryListItem[];
+  page?: number;
+  pageSize?: number;
+  total?: number;
 };

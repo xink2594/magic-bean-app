@@ -35,13 +35,13 @@ type AppState = {
 };
 
 const defaultStats: LiveStats = {
-  airTemp: 24.6,
-  humidity: 67,
-  soilMoisture: 58,
+  airTemp: null,
+  humidity: null,
+  soilMoisture: null,
 };
 
 const defaultConfig: AppConfig = {
-  backendUrl: 'https://plant-proxy.local',
+  backendUrl: 'http://192.168.123.160:8080',
   llmStatus: '离线',
   webdavUrl: 'https://storage.local/webdav/plants/',
   syncEnabled: false,
@@ -170,12 +170,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 }));
 
 function buildLiveStats(devices: Device[], existing: Record<string, LiveStats>) {
-  return devices.reduce<Record<string, LiveStats>>((accumulator, device, index) => {
-    accumulator[device.id] = existing[device.id] ?? {
-      airTemp: defaultStats.airTemp + index * 0.4,
-      humidity: defaultStats.humidity - index * 2,
-      soilMoisture: defaultStats.soilMoisture + index * 3,
-    };
+  return devices.reduce<Record<string, LiveStats>>((accumulator, device) => {
+    accumulator[device.id] = existing[device.id] ?? { ...defaultStats };
     return accumulator;
   }, {});
 }

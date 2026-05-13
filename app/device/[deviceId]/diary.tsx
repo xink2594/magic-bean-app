@@ -1,77 +1,124 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Dimensions, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LATEST_RECORD_ID } from '@/lib/demo-content';
-import { getRecordsByDeviceId } from '@/lib/database';
+import { fetchDiaryList } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
-import { PlantRecord } from '@/lib/types';
+import { DiaryListItem } from '@/lib/types';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const COLUMN_GAP = 12;
+const ITEM_WIDTH = (SCREEN_WIDTH - 40 - COLUMN_GAP) / 2;
 
 export default function DiaryGalleryScreen() {
   const { deviceId } = useLocalSearchParams<{ deviceId: string }>();
   const devices = useAppStore((state) => state.devices);
-  const [records, setRecords] = useState<PlantRecord[]>([]);
+
+  const [records, setRecords] = useState<DiaryListItem[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
     [deviceId, devices],
   );
 
-  useEffect(() => {
-    if (!deviceId) {
+  // 获取设备的 MAC 地址作为 API 的 deviceId 参数
+  const macAddress = device?.macAddress ?? '';
+
+  const fetchData = useCallback(async () => {
+    if (!macAddress) {
+      setLoading(false);
       return;
     }
 
-    getRecordsByDeviceId(deviceId).then(setRecords);
-  }, [deviceId]);
+    const result = await fetchDiaryList(macAddress, 1, 50, device?.backendUrl);
+    if (result?.records) {
+      setRecords(result.records);
+    }
+    setLoading(false);
+  }, [macAddress, device?.backendUrl]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  }, [fetchData]);
+
+  const renderItem = useCallback(({ item, index }: { item: DiaryListItem; index: number }) => {
+    const isLeft = index % 2 === 0;
+
+    return (
+      <TouchableOpacity
+        style={[styles.item, isLeft ? styles.itemLeft : styles.itemRight]}
+        activeOpacity={0.8}
+        onPress={() => {
+          // 可以点击查看详情
+        }}>
+        <Image source={{ uri: item.imageUrl }} style={styles.image} contentFit="cover" />
+        <View style={styles.itemFooter}>
+          <Text variant="labelSmall" style={styles.itemId}>
+            #{item.id}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }, []);
+
+  const renderEmpty = () => {
+    if (loading) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text variant="bodyLarge" style={styles.emptyText}>
+            加载中...
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.emptyContainer}>
+        <Text variant="bodyLarge" style={styles.emptyText}>
+          暂无成长记录
+        </Text>
+        <Text variant="bodyMedium" style={styles.emptySubtext}>
+          设备拍照后会自动同步到这里
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text variant="headlineMedium" style={styles.title}>
-            {device?.name ?? '成长日记'}
-          </Text>
-        </View>
+      <View style={styles.header}>
+        <Text variant="headlineMedium" style={styles.title}>
+          {device?.name ?? '成长日记'}
+        </Text>
+        <Text variant="bodyMedium" style={styles.subtitle}>
+          {records.length > 0 ? `共 ${records.length} 张照片` : ''}
+        </Text>
+      </View>
 
-        {records.map((record) => (
-          <Card key={record.id} style={styles.card}>
-            <Image source={{ uri: record.imageUrl }} style={styles.image} contentFit="cover" />
-            <Card.Content style={styles.cardContent}>
-              <Text variant="titleMedium">📅 {new Date(record.timestamp).toLocaleString()}</Text>
-              <Text variant="bodyMedium" style={styles.subtle}>
-                {record.note || '📝 暂时还没有备注。'}
-              </Text>
-              <Text variant="bodySmall" style={styles.subtle}>
-                🌡️ {record.temp.toFixed(1)}°C · 💧 湿度 {record.humidity.toFixed(0)}%
-              </Text>
-              {record.id === LATEST_RECORD_ID ? (
-                <View style={styles.aiPreview}>
-                  <Text variant="labelLarge" style={styles.aiTitle}>
-                    🤖 AI 速览
-                  </Text>
-                  <Text variant="bodySmall" style={styles.aiCopy}>
-                    健康，长势良好。保持适度浇水、充足散射光，并注意通风。
-                  </Text>
-                </View>
-              ) : null}
-              <Button
-                mode="outlined"
-                onPress={() =>
-                  router.push({
-                    pathname: '/photo/[recordId]',
-                    params: { recordId: record.id },
-                  } as never)
-                }>
-                查看照片与 AI 诊断
-              </Button>
-            </Card.Content>
-          </Card>
-        ))}
-      </ScrollView>
+      <FlatList
+        data={records}
+        renderItem={renderItem}
+        keyExtractor={(item) => String(item.id)}
+        numColumns={2}
+        contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.columnWrapper}
+        ListEmptyComponent={renderEmpty}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#254D32" />
+        }
+        showsVerticalScrollIndicator={false}
+      />
     </SafeAreaView>
   );
 }
@@ -81,13 +128,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F1E8',
   },
-  content: {
-    padding: 20,
-    gap: 18,
-  },
   header: {
-    gap: 8,
-    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 4,
   },
   title: {
     color: '#163020',
@@ -96,32 +141,50 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#5E6859',
   },
-  card: {
+  listContent: {
+    padding: 20,
+    paddingTop: 8,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  item: {
+    width: ITEM_WIDTH,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#FFFDF8',
+    marginBottom: COLUMN_GAP,
+  },
+  itemLeft: {
+    marginRight: COLUMN_GAP / 2,
+  },
+  itemRight: {
+    marginLeft: COLUMN_GAP / 2,
   },
   image: {
     width: '100%',
-    height: 220,
+    height: ITEM_WIDTH * 1.2,
+    backgroundColor: '#E5E1D8',
   },
-  cardContent: {
-    gap: 12,
+  itemFooter: {
+    padding: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  subtle: {
+  itemId: {
     color: '#617062',
   },
-  aiPreview: {
-    borderRadius: 14,
-    backgroundColor: '#EEF3E7',
-    padding: 12,
-    gap: 6,
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 8,
   },
-  aiTitle: {
-    color: '#23412D',
-    fontWeight: '700',
+  emptyText: {
+    color: '#163020',
+    fontWeight: '600',
   },
-  aiCopy: {
-    color: '#4B5B4D',
-    lineHeight: 18,
+  emptySubtext: {
+    color: '#617062',
   },
 });

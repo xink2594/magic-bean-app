@@ -1,21 +1,49 @@
 import axios from 'axios';
 
 import { DEMO_AI_DIAGNOSIS } from '@/lib/demo-content';
-import { PlantRecord } from '@/lib/types';
+import { DeviceLatestData, DiaryListResponse, PlantRecord } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
+
+// 确保 URL 有协议前缀
+function ensureProtocol(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  return `http://${url}`;
+}
+
+// 获取全局后端地址
+function getGlobalBackendUrl(): string {
+  const url = useAppStore.getState().config.backendUrl || '192.168.123.160:8080';
+  return ensureProtocol(url);
+}
 
 export const api = axios.create({
   timeout: 10000,
 });
 
 api.interceptors.request.use((config) => {
-  const { backendUrl } = useAppStore.getState().config;
-
-  return {
-    ...config,
-    baseURL: backendUrl,
-  };
+  const backendUrl = getGlobalBackendUrl();
+  config.baseURL = backendUrl;
+  return config;
 });
+
+// 创建独立的设备 API 客户端（使用设备自己的后端地址）
+function createDeviceApi(backendUrl: string) {
+  return axios.create({
+    baseURL: ensureProtocol(backendUrl),
+    timeout: 10000,
+  });
+}
+
+// 获取 API 客户端（优先使用设备的后端地址）
+function getClient(deviceBackendUrl?: string) {
+  if (deviceBackendUrl?.trim()) {
+    return createDeviceApi(deviceBackendUrl);
+  }
+  return api;
+}
 
 export async function diagnosePlantImage(imageUrl: string) {
   if (
@@ -70,4 +98,56 @@ function getDemoDirtHumidity(recordId: string) {
   }
 
   return 36.0;
+}
+
+// API 响应格式
+type ApiResponse<T> = {
+  code: number;
+  msg: string;
+  data: T | null;
+};
+
+// 获取设备最新数据
+export async function fetchDeviceLatestData(
+  macAddress: string,
+  deviceBackendUrl?: string,
+): Promise<DeviceLatestData | null> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const url = `/api/data/latest/${macAddress}`;
+    console.log('[API] Fetching:', (client.defaults.baseURL || '') + url);
+    const response = await client.get<ApiResponse<DeviceLatestData>>(url);
+
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[API] fetchDeviceLatestData error:', error);
+    return null;
+  }
+}
+
+// 获取设备日记列表
+export async function fetchDiaryList(
+  deviceId: string,
+  page: number = 1,
+  pageSize: number = 20,
+  deviceBackendUrl?: string,
+): Promise<DiaryListResponse | null> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const url = `/api/diary/list?deviceId=${deviceId}&page=${page}&pageSize=${pageSize}`;
+    const response = await client.get<ApiResponse<DiaryListResponse>>(url);
+
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[API] fetchDiaryList error:', error);
+    return null;
+  }
 }

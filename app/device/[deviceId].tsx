@@ -138,9 +138,21 @@ export default function DeviceDetailScreen() {
 
         <Card style={styles.heroCard}>
           <Card.Content style={styles.heroContent}>
-            <Metric label="空气温度" value={`${stats.airTemp.toFixed(1)}°C`} accent="#E89B5C" />
-            <Metric label="空气湿度" value={`${stats.humidity.toFixed(0)}%`} accent="#5FA8D3" />
-            <Metric label="土壤湿度" value={`${stats.soilMoisture.toFixed(0)}%`} accent="#6A994E" />
+            <Metric
+              label="空气温度"
+              value={stats.airTemp !== null ? `${stats.airTemp.toFixed(1)}°C` : '--'}
+              accent="#E89B5C"
+            />
+            <Metric
+              label="空气湿度"
+              value={stats.humidity !== null ? `${stats.humidity.toFixed(0)}%` : '--'}
+              accent="#5FA8D3"
+            />
+            <Metric
+              label="土壤湿度"
+              value={stats.soilMoisture !== null ? `${stats.soilMoisture.toFixed(0)}%` : '--'}
+              accent="#6A994E"
+            />
           </Card.Content>
         </Card>
 
