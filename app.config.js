@@ -1,6 +1,22 @@
+const buildProfile = process.env.EAS_BUILD_PROFILE || "production";
+
+// 根据构建 profile 设置不同的包名和应用名称
+const getPackageName = () => {
+  const base = "com.xink2594.magicbean";
+  if (buildProfile === "development") return base + ".develop";
+  if (buildProfile === "preview") return base + ".preview";
+  return base;
+};
+
+const getAppName = () => {
+  if (buildProfile === "development") return "Magic Bean Dev";
+  if (buildProfile === "preview") return "Magic Bean Preview";
+  return "Magic Bean";
+};
+
 const config = {
   expo: {
-    name: process.env.APP_DISPLAY_NAME || "Magic Bean",
+    name: getAppName(),
     slug: "magic-bean-app",
     version: "1.0.0-dev.6",
     orientation: "portrait",
@@ -10,7 +26,7 @@ const config = {
     newArchEnabled: true,
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.xink2594.magicbean",
+      bundleIdentifier: getPackageName(),
       buildNumber: "6",
       entitlements: {
         "com.apple.developer.networking.wifi-info": true,
@@ -23,7 +39,7 @@ const config = {
       },
     },
     android: {
-      package: "com.xink2594.magicbean",
+      package: getPackageName(),
       usesCleartextTraffic: true,
       versionCode: 6,
       adaptiveIcon: {
