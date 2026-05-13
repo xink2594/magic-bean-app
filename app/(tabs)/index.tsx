@@ -19,10 +19,10 @@ export default function DashboardScreen() {
 
   const heroText = useMemo(() => {
     if (!devices.length) {
-      return '添加你的第一台智能花盆，开始离线记录植物环境数据。';
+      return '添加你的第一台智能花盆，开始记录植物环境数据。';
     }
 
-    return `已连接 ${devices.length} 台花盆设备，随时可以进行本地同步。`;
+    return `已连接 ${devices.length} 台花盆设备`;
   }, [devices.length]);
 
   const fetchData = useCallback(async () => {
@@ -75,14 +75,6 @@ export default function DashboardScreen() {
           <Text variant="bodyLarge" style={styles.heroCopy}>
             {heroText}
           </Text>
-          <View style={styles.heroChips}>
-            <Chip icon="database" compact>
-              SQLite 本地优先
-            </Chip>
-            <Chip icon="wifi-off" compact>
-              支持离线使用
-            </Chip>
-          </View>
         </View>
 
         {devices.map((device) => {
@@ -208,11 +200,6 @@ const styles = StyleSheet.create({
   heroCopy: {
     color: '#DCE8D1',
     lineHeight: 22,
-  },
-  heroChips: {
-    flexDirection: 'row',
-    gap: 10,
-    flexWrap: 'wrap',
   },
   card: {
     backgroundColor: '#FFFDF8',
