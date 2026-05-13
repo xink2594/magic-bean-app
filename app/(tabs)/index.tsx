@@ -108,9 +108,13 @@ export default function DashboardScreen() {
                       </Chip>
                     )}
                     <Chip
-                      icon="leaf"
+                      icon={online ? 'leaf' : 'leaf-off'}
                       compact
-                      style={[styles.statusChip, { backgroundColor: online ? '#D9F4DE' : '#ECE7DD' }]}>
+                      style={[
+                        styles.statusChip,
+                        { backgroundColor: online ? '#D9F4DE' : '#FFEBEE' }
+                      ]}
+                      textStyle={{ color: online ? '#1F7A37' : '#C62828' }}>
                       {online ? 'Online' : 'Offline'}
                     </Chip>
                   </View>
