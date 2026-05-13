@@ -2,7 +2,7 @@
   "expo": {
     "name": "Magic Bean",
     "slug": "magic-bean-app",
-    "version": "1.0.0-dev.4",
+    "version": "1.0.0-dev.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "magicbeanapp",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xink2594.magicbean",
-      "buildNumber": "4",
+      "buildNumber": "6",
       "entitlements": {
         "com.apple.developer.networking.wifi-info": true
       },
@@ -25,7 +25,7 @@
     "android": {
       "package": "com.xink2594.magicbean",
       "usesCleartextTraffic": true,
-      "versionCode": 4,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -79,7 +79,8 @@
       ],
       "expo-sqlite",
       "expo-web-browser",
-      "react-native-wifi-reborn"
+      "react-native-wifi-reborn",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

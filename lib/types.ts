@@ -98,3 +98,14 @@ export type HistoryDataItem = {
 export type HistoryDataResponse = {
   records: HistoryDataItem[];
 };
+
+// 日记详情
+export type DiaryDetail = {
+  id: number;
+  timestamp: number;
+  imageUrl: string;
+  temperature: number;
+  airHumidity: number;
+  dirtHumidity: number;
+  note: string;
+};

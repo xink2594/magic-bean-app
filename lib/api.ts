@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 import { DEMO_AI_DIAGNOSIS } from '@/lib/demo-content';
-import { DeviceLatestData, DiaryListResponse, HistoryDataResponse, PlantRecord } from '@/lib/types';
+import { DeviceLatestData, DiaryDetail, DiaryListResponse, HistoryDataResponse, PlantRecord } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 
 // 获取全局后端地址
@@ -146,10 +146,18 @@ export async function fetchDiaryList(
 export async function fetchHistoryData(
   deviceId: string,
   deviceBackendUrl?: string,
+  startTime?: number,
+  endTime?: number,
 ): Promise<HistoryDataResponse | null> {
   try {
     const client = getClient(deviceBackendUrl);
-    const url = `/api/data/history?deviceId=${deviceId}`;
+    let url = `/api/data/history?deviceId=${deviceId}`;
+    if (startTime) {
+      url += `&startTime=${startTime}`;
+    }
+    if (endTime) {
+      url += `&endTime=${endTime}`;
+    }
     const response = await client.get<ApiResponse<HistoryDataResponse>>(url);
 
     if (response.data.code === 200 && response.data.data) {
@@ -160,5 +168,58 @@ export async function fetchHistoryData(
   } catch (error) {
     console.error('[API] fetchHistoryData error:', error);
     return null;
+  }
+}
+
+// 获取日记详情
+export async function fetchDiaryDetail(
+  deviceId: string,
+  id: number,
+  deviceBackendUrl?: string,
+): Promise<DiaryDetail | null> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const url = `/api/diary/detail?deviceId=${deviceId}&id=${id}`;
+    const response = await client.get<ApiResponse<DiaryDetail>>(url);
+
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[API] fetchDiaryDetail error:', error);
+    return null;
+  }
+}
+
+// 保存日记备注
+export async function saveDiaryNote(
+  id: number,
+  note: string,
+  deviceBackendUrl?: string,
+): Promise<boolean> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const response = await client.post('/api/diary/save', { id, note });
+    return response.data.code === 200;
+  } catch (error) {
+    console.error('[API] saveDiaryNote error:', error);
+    return false;
+  }
+}
+
+// 删除日记（逻辑删除）
+export async function deleteDiary(
+  id: number,
+  deviceBackendUrl?: string,
+): Promise<boolean> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const response = await client.post('/api/diary/delete', { id });
+    return response.data.code === 200;
+  } catch (error) {
+    console.error('[API] deleteDiary error:', error);
+    return false;
   }
 }

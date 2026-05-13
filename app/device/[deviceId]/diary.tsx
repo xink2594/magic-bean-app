@@ -60,7 +60,10 @@ export default function DiaryGalleryScreen() {
         style={[styles.item, isLeft ? styles.itemLeft : styles.itemRight]}
         activeOpacity={0.8}
         onPress={() => {
-          // 可以点击查看详情
+          router.push({
+            pathname: '/diary/[recordId]',
+            params: { recordId: String(item.id), deviceId: deviceId ?? '' },
+          } as never);
         }}>
         <Image source={{ uri: item.imageUrl }} style={styles.image} contentFit="cover" />
         <View style={styles.itemFooter}>
@@ -70,7 +73,7 @@ export default function DiaryGalleryScreen() {
         </View>
       </TouchableOpacity>
     );
-  }, []);
+  }, [deviceId]);
 
   const renderEmpty = () => {
     if (loading) {

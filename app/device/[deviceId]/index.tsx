@@ -113,24 +113,37 @@ export default function DeviceDetailScreen() {
       return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
     };
 
-    // 温度数据（左轴）
-    const tempData = recentData.map((item) => ({
-      value: item.temperature,
-      label: formatLabel(item.timestamp),
-      labelTextStyle: styles.axisLabel,
-    }));
+    // 温度数据（左轴）- 使用普通对象避免冻结问题
+    const tempData = recentData.map((item) => {
+      const obj: { value: number; label: string; labelTextStyle?: any } = {
+        value: Number(item.temperature),
+        label: formatLabel(item.timestamp),
+      };
+      return obj;
+    });
 
     // 空气湿度数据（右轴）
     const airHumidityData = recentData.map((item) => ({
-      value: item.airHumidity,
+      value: Number(item.airHumidity),
     }));
 
     // 土壤湿度数据（右轴）
     const soilHumidityData = recentData.map((item) => ({
-      value: item.dirtHumidity,
+      value: Number(item.dirtHumidity),
     }));
 
-    return { tempData, airHumidityData, soilHumidityData };
+    // 深拷贝避免冻结问题
+    const result = {
+      tempData: JSON.parse(JSON.stringify(tempData)),
+      airHumidityData: JSON.parse(JSON.stringify(airHumidityData)),
+      soilHumidityData: JSON.parse(JSON.stringify(soilHumidityData)),
+    };
+
+    console.log('[Chart] tempData:', result.tempData);
+    console.log('[Chart] airHumidityData:', result.airHumidityData);
+    console.log('[Chart] soilHumidityData:', result.soilHumidityData);
+
+    return result;
   }, [historyData]);
 
   return (
@@ -203,27 +216,29 @@ export default function DeviceDetailScreen() {
           </Card.Content>
         </Card>
 
-        {chartData && (
-          <Card style={styles.card}>
-            <Card.Content style={styles.section}>
-              <Text variant="titleMedium">历史趋势</Text>
+        {/* 历史趋势 - 始终显示 */}
+        <Card style={styles.card}>
+          <Card.Content style={styles.section}>
+            <Text variant="titleMedium">历史趋势</Text>
 
-              {/* 图例 */}
-              <View style={styles.legendContainer}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#E89B5C' }]} />
-                  <Text variant="labelSmall" style={styles.legendText}>温度 (左轴)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#5FA8D3' }]} />
-                  <Text variant="labelSmall" style={styles.legendText}>空气湿度 (右轴)</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: '#6A994E' }]} />
-                  <Text variant="labelSmall" style={styles.legendText}>土壤湿度 (右轴)</Text>
-                </View>
+            {/* 图例 */}
+            <View style={styles.legendContainer}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#6A994E' }]} />
+                <Text variant="labelSmall" style={styles.legendText}>温度</Text>
               </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#5FA8D3' }]} />
+                <Text variant="labelSmall" style={styles.legendText}>空气湿度</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#E89B5C' }]} />
+                <Text variant="labelSmall" style={styles.legendText}>土壤湿度</Text>
+              </View>
+            </View>
 
+            {/* 图表区域 */}
+            {chartData ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.chartContainer}>
                   <LineChart
@@ -231,47 +246,53 @@ export default function DeviceDetailScreen() {
                     data2={chartData.airHumidityData}
                     data3={chartData.soilHumidityData}
                     height={180}
-                    width={Math.max(320, chartData.tempData.length * 45)}
-                    color1="#E89B5C"
+                    width={Math.max(320, chartData.tempData.length * 50)}
+                    color1="#6A994E"
                     color2="#5FA8D3"
-                    color3="#6A994E"
-                    thickness1={2}
-                    thickness2={2}
-                    thickness3={2}
-                    dataPointsColor1="#E89B5C"
+                    color3="#E89B5C"
+                    thickness={2}
+                    dataPointsColor1="#6A994E"
                     dataPointsColor2="#5FA8D3"
-                    dataPointsColor3="#6A994E"
-                    dataPointsRadius={3}
-                    hideDataPoints={false}
+                    dataPointsColor3="#E89B5C"
+                    dataPointsRadius={4}
                     yAxisColor="#617062"
                     yAxisThickness={1}
                     xAxisColor="#617062"
                     xAxisThickness={1}
                     yAxisTextStyle={styles.axisLabel}
                     xAxisLabelTextStyle={styles.axisLabel}
-                    noOfSections={4}
-                    spacing={30}
+                    noOfSections={5}
+                    maxValue={100}
+                    minValue={0}
+                    spacing={40}
                     backgroundColor="transparent"
                     curved
                     isAnimated
+                    hideRules={false}
+                    rulesColor="#E5E1D8"
+                    rulesThickness={1}
                     showValuesAsDataPointsText={false}
-                    yAxisLabelTexts={generateYAxisLabels(chartData.tempData, 0, 50)}
-                    secondaryYAxis={{
-                      yAxisColor: '#617062',
-                      yAxisThickness: 1,
-                      yAxisTextStyle: styles.axisLabel,
-                      noOfSections: 4,
-                      yAxisLabelTexts: generateYAxisLabels(chartData.airHumidityData, 0, 100),
-                    }}
                   />
                 </View>
               </ScrollView>
-              <Text variant="bodySmall" style={styles.chartHint}>
-                显示最近 {chartData.tempData.length} 条记录
-              </Text>
-            </Card.Content>
-          </Card>
-        )}
+            ) : (
+              <View style={styles.emptyChart}>
+                <Text variant="bodyMedium" style={styles.emptyChartText}>
+                  暂无历史数据
+                </Text>
+                <Text variant="bodySmall" style={styles.emptyChartHint}>
+                  等待设备上传数据
+                </Text>
+              </View>
+            )}
+
+            <Text variant="bodySmall" style={styles.chartHint}>
+              {historyData.length > 0
+                ? `显示最近 ${Math.min(historyData.length, 12)} 条记录`
+                : '当前无数据'}
+            </Text>
+          </Card.Content>
+        </Card>
 
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
@@ -448,6 +469,20 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     paddingVertical: 10,
+  },
+  emptyChart: {
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F1E8',
+    borderRadius: 12,
+    gap: 8,
+  },
+  emptyChartText: {
+    color: '#617062',
+  },
+  emptyChartHint: {
+    color: '#999',
   },
   chartHint: {
     color: '#617062',
