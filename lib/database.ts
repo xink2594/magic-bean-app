@@ -57,6 +57,7 @@ export async function initDatabase() {
 
   await ensureDeviceMqttColumn(db);
   await ensureDeviceTopicColumn(db);
+  await ensureDeviceBackendUrlColumn(db);
 }
 
 export async function getDevices(): Promise<Device[]> {
@@ -68,8 +69,9 @@ export async function getDevices(): Promise<Device[]> {
     created_at: string;
     mqtt_url: string;
     mqtt_topic: string;
+    backend_url: string;
   }>(
-    "SELECT id, mac_address, name, created_at, mqtt_url, mqtt_topic FROM devices ORDER BY created_at DESC",
+    "SELECT id, mac_address, name, created_at, mqtt_url, mqtt_topic, backend_url FROM devices ORDER BY created_at DESC",
   );
 
   return rows.map((row) => ({
@@ -79,6 +81,7 @@ export async function getDevices(): Promise<Device[]> {
     createdAt: row.created_at,
     mqttUrl: row.mqtt_url,
     mqttTopic: row.mqtt_topic,
+    backendUrl: row.backend_url,
   }));
 }
 
@@ -91,8 +94,9 @@ export async function getDeviceById(deviceId: string): Promise<Device | null> {
     created_at: string;
     mqtt_url: string;
     mqtt_topic: string;
+    backend_url: string;
   }>(
-    "SELECT id, mac_address, name, created_at, mqtt_url, mqtt_topic FROM devices WHERE id = ?",
+    "SELECT id, mac_address, name, created_at, mqtt_url, mqtt_topic, backend_url FROM devices WHERE id = ?",
     deviceId,
   );
 
@@ -107,11 +111,12 @@ export async function getDeviceById(deviceId: string): Promise<Device | null> {
     createdAt: row.created_at,
     mqttUrl: row.mqtt_url,
     mqttTopic: row.mqtt_topic,
+    backendUrl: row.backend_url,
   };
 }
 
 export async function addDevice(
-  input: Pick<Device, "macAddress" | "name"> & { mqttUrl?: string; mqttTopic?: string },
+  input: Pick<Device, "macAddress" | "name"> & { mqttUrl?: string; mqttTopic?: string; backendUrl?: string },
 ): Promise<Device> {
   const db = await databasePromise;
   const device: Device = {
@@ -121,16 +126,18 @@ export async function addDevice(
     createdAt: new Date().toISOString(),
     mqttUrl: input.mqttUrl ?? "",
     mqttTopic: input.mqttTopic ?? `plant/${input.macAddress}/status`,
+    backendUrl: input.backendUrl ?? "",
   };
 
   await db.runAsync(
-    "INSERT INTO devices (id, mac_address, name, created_at, mqtt_url, mqtt_topic) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO devices (id, mac_address, name, created_at, mqtt_url, mqtt_topic, backend_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
     device.id,
     device.macAddress,
     device.name,
     device.createdAt,
     device.mqttUrl,
     device.mqttTopic,
+    device.backendUrl,
   );
 
   return device;
@@ -145,12 +152,14 @@ export async function updateDeviceMqttConfig(
   deviceId: string,
   mqttUrl: string,
   mqttTopic: string,
+  backendUrl: string,
 ) {
   const db = await databasePromise;
   await db.runAsync(
-    "UPDATE devices SET mqtt_url = ?, mqtt_topic = ? WHERE id = ?",
+    "UPDATE devices SET mqtt_url = ?, mqtt_topic = ?, backend_url = ? WHERE id = ?",
     mqttUrl,
     mqttTopic,
+    backendUrl,
     deviceId,
   );
 }
@@ -300,6 +309,22 @@ async function ensureDeviceTopicColumn(
   if (!hasMqttTopic) {
     await db.execAsync(
       "ALTER TABLE devices ADD COLUMN mqtt_topic TEXT NOT NULL DEFAULT '';",
+    );
+  }
+}
+
+async function ensureDeviceBackendUrlColumn(
+  db: Awaited<ReturnType<typeof SQLite.openDatabaseAsync>>,
+) {
+  const columns = await db.getAllAsync<{
+    name: string;
+  }>("PRAGMA table_info(devices)");
+
+  const hasBackendUrl = columns.some((column) => column.name === "backend_url");
+
+  if (!hasBackendUrl) {
+    await db.execAsync(
+      "ALTER TABLE devices ADD COLUMN backend_url TEXT NOT NULL DEFAULT '';",
     );
   }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Button, Card, HelperText, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAppStore } from '@/lib/store';
@@ -18,13 +18,15 @@ export default function DeviceConfigScreen() {
 
   const [mqttUrl, setMqttUrl] = useState(device?.mqttUrl ?? '');
   const [mqttTopic, setMqttTopic] = useState(device?.mqttTopic ?? '');
+  const [backendUrl, setBackendUrl] = useState(device?.backendUrl ?? '');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     setMqttUrl(device?.mqttUrl ?? '');
     setMqttTopic(device?.mqttTopic ?? '');
-  }, [device?.mqttTopic, device?.mqttUrl]);
+    setBackendUrl(device?.backendUrl ?? '');
+  }, [device?.mqttTopic, device?.mqttUrl, device?.backendUrl]);
 
   if (!device) {
     return null;
@@ -32,9 +34,9 @@ export default function DeviceConfigScreen() {
 
   const onSave = async () => {
     setSaving(true);
-    await saveDeviceMqttConfig(device.id, mqttUrl.trim(), mqttTopic.trim());
+    await saveDeviceMqttConfig(device.id, mqttUrl.trim(), mqttTopic.trim(), backendUrl.trim());
     setSaving(false);
-    setMessage('设备 MQTT 配置已保存。');
+    setMessage('设备配置已保存。');
   };
 
   return (
@@ -86,6 +88,18 @@ export default function DeviceConfigScreen() {
             <Text variant="bodyMedium" style={styles.helper}>
               例如 `plant/AABBCCDDEEFF/status`。收到 `{"{"}"status":"online"{"}"}` 时会显示在线状态。
             </Text>
+
+            <Text variant="titleMedium">自定义后端地址</Text>
+            <TextInput
+              label="后端地址"
+              value={backendUrl}
+              onChangeText={setBackendUrl}
+              mode="outlined"
+              placeholder="https://api.example.com"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <HelperText type="info">该设备的 AI 诊断与同步请求会优先使用此地址。</HelperText>
 
             <View style={styles.actions}>
               <Button mode="contained" onPress={onSave} loading={saving} disabled={saving}>

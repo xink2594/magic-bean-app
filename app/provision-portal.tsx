@@ -69,6 +69,7 @@ export default function ProvisionPortalScreen() {
         name: (deviceName || macAddress).trim(),
         mqttUrl,
         mqttTopic: `plant/${macAddress}/status`,
+        backendUrl: '',
       });
       setSaving(false);
       setMessage('配网成功，正在返回首页。');

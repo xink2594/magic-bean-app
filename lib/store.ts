@@ -22,9 +22,9 @@ type AppState = {
   hydrate: () => Promise<void>;
   saveSettings: (config: AppConfig) => Promise<void>;
   clearAppData: () => Promise<void>;
-  addProvisionedDevice: (input: Pick<Device, 'macAddress' | 'name' | 'mqttUrl' | 'mqttTopic'>) => Promise<void>;
+  addProvisionedDevice: (input: Pick<Device, 'macAddress' | 'name' | 'mqttUrl' | 'mqttTopic' | 'backendUrl'>) => Promise<void>;
   removeDevice: (deviceId: string) => Promise<void>;
-  saveDeviceMqttConfig: (deviceId: string, mqttUrl: string, mqttTopic: string) => Promise<void>;
+  saveDeviceMqttConfig: (deviceId: string, mqttUrl: string, mqttTopic: string, backendUrl: string) => Promise<void>;
   setDevicePresence: (macAddress: string, isOnline: boolean) => void;
   isDeviceOnline: (macAddress: string) => boolean;
   updateLiveStats: (deviceId: string, stats: Partial<LiveStats>) => void;
@@ -88,11 +88,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     }));
   },
-  saveDeviceMqttConfig: async (deviceId, mqttUrl, mqttTopic) => {
-    await updateDeviceMqttConfig(deviceId, mqttUrl, mqttTopic);
+  saveDeviceMqttConfig: async (deviceId, mqttUrl, mqttTopic, backendUrl) => {
+    await updateDeviceMqttConfig(deviceId, mqttUrl, mqttTopic, backendUrl);
     set((state) => ({
       devices: state.devices.map((device) =>
-        device.id === deviceId ? { ...device, mqttUrl, mqttTopic } : device,
+        device.id === deviceId ? { ...device, mqttUrl, mqttTopic, backendUrl } : device,
       ),
     }));
   },

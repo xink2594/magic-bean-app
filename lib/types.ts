@@ -5,6 +5,7 @@ export type Device = {
   createdAt: string;
   mqttUrl: string;
   mqttTopic: string;
+  backendUrl: string;
 };
 
 export type PlantRecord = {
