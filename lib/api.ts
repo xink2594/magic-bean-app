@@ -394,6 +394,21 @@ export async function deleteDiary(
   }
 }
 
+// 恢复已删除的日记
+export async function restoreDiary(
+  id: number,
+  deviceBackendUrl?: string,
+): Promise<boolean> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const response = await client.post('/api/diary/restore', { id });
+    return response.data.code === 200;
+  } catch (error) {
+    console.error('[API] restoreDiary error:', error);
+    return false;
+  }
+}
+
 // 解析补光建议文本 "R: 255, G: 200, B: 150" → { r, g, b }
 function parseLightAdvice(text?: string): { r: number; g: number; b: number } | undefined {
   if (!text) return undefined;

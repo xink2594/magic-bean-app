@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Dialog, Divider, IconButton, Portal, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +25,7 @@ export default function DiaryDetailScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AiAnalysisResult | null>(null);
   const [showAiDialog, setShowAiDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [customPrompt, setCustomPrompt] = useState(false);
   const [promptText, setPromptText] = useState('');
   const [message, setMessage] = useState('');
@@ -108,25 +109,17 @@ export default function DiaryDetailScreen() {
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!detail) return;
 
-    Alert.alert('删除手记', '确定要删除这条手记吗？删除后无法恢复。', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除',
-        style: 'destructive',
-        onPress: async () => {
-          const success = await deleteDiary(detail.id, device?.backendUrl);
-          if (success) {
-            setMessage('手记已删除');
-            setTimeout(() => router.back(), 500);
-          } else {
-            setMessage('删除失败，请重试');
-          }
-        },
-      },
-    ]);
+    setShowDeleteDialog(false);
+    const success = await deleteDiary(detail.id, device?.backendUrl);
+    if (success) {
+      setMessage('手记已删除');
+      setTimeout(() => router.back(), 500);
+    } else {
+      setMessage('删除失败，请重试');
+    }
   };
 
   if (loading) {
@@ -306,7 +299,7 @@ export default function DiaryDetailScreen() {
             mode="outlined"
             buttonColor="#FFF4F2"
             textColor="#B3261E"
-            onPress={handleDelete}
+            onPress={() => setShowDeleteDialog(true)}
             style={styles.deleteButton}>
             删除手记
           </Button>
@@ -408,6 +401,18 @@ export default function DiaryDetailScreen() {
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowAiDialog(false)}>关闭</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* 删除确认对话框 */}
+        <Dialog visible={showDeleteDialog} onDismiss={() => setShowDeleteDialog(false)} style={styles.dialog}>
+          <Dialog.Title>删除手记</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">确定要删除这条手记吗？可在回收站中撤回。</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowDeleteDialog(false)}>取消</Button>
+            <Button textColor="#B3261E" onPress={handleDelete}>删除</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

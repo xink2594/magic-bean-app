@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { IconButton, Text } from 'react-native-paper';
+import { Button, Dialog, IconButton, Portal, Snackbar, Text } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchDiaryTrash } from '@/lib/api';
+import { fetchDiaryTrash, restoreDiary } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { DiaryListItem } from '@/lib/types';
 
@@ -20,6 +20,9 @@ export default function TrashScreen() {
   const [records, setRecords] = useState<DiaryListItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<DiaryListItem | null>(null);
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
@@ -51,13 +54,32 @@ export default function TrashScreen() {
     setRefreshing(false);
   }, [fetchData]);
 
+  const handleRestore = useCallback((item: DiaryListItem) => {
+    setRestoreTarget(item);
+    setShowRestoreDialog(true);
+  }, []);
+
+  const confirmRestore = async () => {
+    if (!restoreTarget) return;
+    setShowRestoreDialog(false);
+    const success = await restoreDiary(restoreTarget.id, device?.backendUrl);
+    if (success) {
+      setRecords((prev) => prev.filter((r) => r.id !== restoreTarget.id));
+      setMessage('已恢复');
+    } else {
+      setMessage('恢复失败，请重试');
+    }
+    setRestoreTarget(null);
+  };
+
   const renderItem = useCallback(({ item, index }: { item: DiaryListItem; index: number }) => {
     const isLeft = index % 2 === 0;
 
     return (
       <TouchableOpacity
         style={[styles.item, isLeft ? styles.itemLeft : styles.itemRight]}
-        activeOpacity={0.8}>
+        activeOpacity={0.8}
+        onLongPress={() => handleRestore(item)}>
         <Image source={{ uri: item.imageUrl }} style={styles.image} contentFit="cover" />
         <View style={styles.itemFooter}>
           <Text variant="labelSmall" style={styles.itemId}>
@@ -66,7 +88,7 @@ export default function TrashScreen() {
         </View>
       </TouchableOpacity>
     );
-  }, []);
+  }, [handleRestore]);
 
   const renderEmpty = () => {
     if (loading) {
@@ -123,6 +145,25 @@ export default function TrashScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      <Portal>
+        <Dialog visible={showRestoreDialog} onDismiss={() => setShowRestoreDialog(false)} style={styles.dialog}>
+          <Dialog.Title>撤回手记</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              确定要恢复手记 #{restoreTarget?.id} 吗？
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowRestoreDialog(false)}>取消</Button>
+            <Button onPress={confirmRestore}>恢复</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
+        {message}
+      </Snackbar>
     </SafeAreaView>
   );
 }
@@ -192,5 +233,8 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     color: '#617062',
+  },
+  dialog: {
+    backgroundColor: '#FFFDF8',
   },
 });
