@@ -272,6 +272,8 @@ export type AiAnalysisResult = {
   species: string;
   analysis: string;
   suggestions: string[];
+  lightAdvice?: { r: number; g: number; b: number };
+  waterAdvice?: { setTime: number };
 };
 
 // AI 分析植物图片
@@ -281,10 +283,11 @@ export async function analyzePlantImage(
   airHumidity?: number | null,
   dirtHumidity?: number | null,
   deviceBackendUrl?: string,
+  aiPrompt?: string,
 ): Promise<AiAnalysisResult | null> {
   // const prompt = '你是一位资深的植物病理学家和高级园艺师。你的任务是根据植物照片和传感器数据，诊断植物健康状况。输入的环境数据参考（可能为空）：当前温度：' + (temperature ?? '无') + '℃，空气湿度：' + (airHumidity ?? '无') + '%，土壤湿度：' + (dirtHumidity ?? '无') + '%。请严格以合法的 JSON 格式输出你的诊断结果，只输出 JSON 字符串，不要包含任何 Markdown 标记（如 ```json）和其他解释性文字。JSON 结构如下：{"species":"植物的俗名或学名","analysis":"结合图片和环境数据，详细描述植物当前长势、病害或异常原因的分析过程。","suggestions":["具体的浇水/土壤管理建议","具体的光照/温度调整建议","施肥或病虫害处理建议"]}';
-  const prompt = ''
-  
+  const prompt = aiPrompt ?? ''
+
   try {
     // AI 分析可能需要更长时间，使用更长的超时
     const client = axios.create({
@@ -317,6 +320,8 @@ export async function analyzePlantImage(
         species: data.plantVariety ?? '未知',
         analysis: data.growthAnalysis ?? '',
         suggestions,
+        lightAdvice: parseLightAdvice(data.lightAdvice),
+        waterAdvice: parseWaterAdvice(data.waterAdvice),
       } as AiAnalysisResult;
     }
 
@@ -387,4 +392,30 @@ export async function deleteDiary(
     console.error('[API] deleteDiary error:', error);
     return false;
   }
+}
+
+// 解析补光建议文本 "R: 255, G: 200, B: 150" → { r, g, b }
+function parseLightAdvice(text?: string): { r: number; g: number; b: number } | undefined {
+  if (!text) return undefined;
+  const rMatch = text.match(/R:\s*(\d+)/i);
+  const gMatch = text.match(/G:\s*(\d+)/i);
+  const bMatch = text.match(/B:\s*(\d+)/i);
+  if (rMatch && gMatch && bMatch) {
+    return {
+      r: Math.min(255, parseInt(rMatch[1], 10)),
+      g: Math.min(255, parseInt(gMatch[1], 10)),
+      b: Math.min(255, parseInt(bMatch[1], 10)),
+    };
+  }
+  return undefined;
+}
+
+// 解析浇水建议文本 "set_time: 30" → { setTime }
+function parseWaterAdvice(text?: string): { setTime: number } | undefined {
+  if (!text) return undefined;
+  const match = text.match(/set_time:\s*(\d+)/i);
+  if (match) {
+    return { setTime: Math.max(5, Math.min(60, parseInt(match[1], 10))) };
+  }
+  return undefined;
 }

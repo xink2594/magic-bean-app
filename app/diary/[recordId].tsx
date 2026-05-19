@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Dialog, Divider, IconButton, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
+import { Button, Card, Dialog, Divider, IconButton, Portal, Snackbar, Switch, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 
@@ -12,6 +12,8 @@ import { DiaryDetail } from '@/lib/types';
 export default function DiaryDetailScreen() {
   const { recordId, deviceId } = useLocalSearchParams<{ recordId: string; deviceId: string }>();
   const devices = useAppStore((state) => state.devices);
+  const saveWaterConfig = useAppStore((state) => state.saveWaterConfig);
+  const saveLightConfig = useAppStore((state) => state.saveLightConfig);
 
   const [detail, setDetail] = useState<DiaryDetail | null>(null);
   const [note, setNote] = useState('');
@@ -23,6 +25,8 @@ export default function DiaryDetailScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AiAnalysisResult | null>(null);
   const [showAiDialog, setShowAiDialog] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState(false);
+  const [promptText, setPromptText] = useState('');
   const [message, setMessage] = useState('');
 
   const device = useMemo(
@@ -91,6 +95,7 @@ export default function DiaryDetailScreen() {
       detail.airHumidity,
       detail.dirtHumidity,
       device?.backendUrl,
+      customPrompt ? promptText : undefined,
     );
 
     setAnalyzing(false);
@@ -269,6 +274,21 @@ export default function DiaryDetailScreen() {
           <Card style={styles.card}>
             <Card.Content style={styles.aiContent}>
               <Text variant="titleMedium">AI 植物诊断</Text>
+              <View style={styles.promptToggle}>
+                <Text variant="bodyMedium">自定义提示词</Text>
+                <Switch value={customPrompt} onValueChange={setCustomPrompt} />
+              </View>
+              {customPrompt && (
+                <TextInput
+                  value={promptText}
+                  onChangeText={setPromptText}
+                  mode="outlined"
+                  multiline
+                  numberOfLines={4}
+                  placeholder="输入自定义 AI 提示词..."
+                  style={styles.promptInput}
+                />
+              )}
               <Button
                 mode="contained"
                 icon="robot"
@@ -324,6 +344,64 @@ export default function DiaryDetailScreen() {
                       </View>
                     ))}
                   </View>
+
+                  {aiResult.lightAdvice && (
+                    <>
+                      <Divider style={styles.divider} />
+                      <View style={styles.resultSection}>
+                        <Text variant="titleMedium" style={styles.resultLabel}>💡 补光建议</Text>
+                        <Text variant="bodyMedium" style={styles.resultText}>
+                          R:{aiResult.lightAdvice.r} G:{aiResult.lightAdvice.g} B:{aiResult.lightAdvice.b}
+                        </Text>
+                        <Button
+                          mode="outlined"
+                          icon="lightbulb"
+                          compact
+                          onPress={() => {
+                            saveLightConfig({
+                              rgbMode: 'custom',
+                              r: String(aiResult.lightAdvice!.r),
+                              g: String(aiResult.lightAdvice!.g),
+                              b: String(aiResult.lightAdvice!.b),
+                            });
+                            setMessage('已应用补光配置');
+                            setShowAiDialog(false);
+                          }}
+                          style={styles.applyButton}>
+                          应用到补光灯
+                        </Button>
+                      </View>
+                    </>
+                  )}
+
+                  {aiResult.waterAdvice && (
+                    <>
+                      <Divider style={styles.divider} />
+                      <View style={styles.resultSection}>
+                        <Text variant="titleMedium" style={styles.resultLabel}>💧 浇水建议</Text>
+                        <Text variant="bodyMedium" style={styles.resultText}>
+                          持续 {aiResult.waterAdvice.setTime} 秒
+                        </Text>
+                        <Button
+                          mode="outlined"
+                          icon="water"
+                          compact
+                          onPress={() => {
+                            saveWaterConfig({
+                              actionMode: 'default',
+                              actionType: 'water',
+                              durationMode: 'custom',
+                              duration: String(aiResult.waterAdvice!.setTime),
+                            });
+                            setMessage('已应用浇水配置');
+                            setShowAiDialog(false);
+                          }}
+                          style={styles.applyButton}>
+                          应用到浇水
+                        </Button>
+                      </View>
+                    </>
+                  )}
                 </>
               )}
             </ScrollView>
@@ -412,6 +490,15 @@ const styles = StyleSheet.create({
   aiContent: {
     gap: 12,
   },
+  promptToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  promptInput: {
+    backgroundColor: '#FFFDF8',
+    textAlignVertical: 'top',
+  },
   aiButton: {
     backgroundColor: '#254D32',
   },
@@ -458,5 +545,9 @@ const styles = StyleSheet.create({
     color: '#163020',
     flex: 1,
     lineHeight: 22,
+  },
+  applyButton: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
 });
