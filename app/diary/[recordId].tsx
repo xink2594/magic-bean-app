@@ -282,15 +282,26 @@ export default function DiaryDetailScreen() {
                   style={styles.promptInput}
                 />
               )}
-              <Button
-                mode="contained"
-                icon="robot"
-                onPress={handleAnalyze}
-                loading={analyzing}
-                disabled={analyzing}
-                style={styles.aiButton}>
-                AI 分析
-              </Button>
+              <View style={styles.aiButtonRow}>
+                <Button
+                  mode="contained"
+                  icon="robot"
+                  onPress={handleAnalyze}
+                  loading={analyzing}
+                  disabled={analyzing}
+                  style={styles.aiButton}>
+                  AI 分析
+                </Button>
+                {aiResult && (
+                  <Button
+                    mode="outlined"
+                    icon="history"
+                    onPress={() => setShowAiDialog(true)}
+                    style={styles.aiHistoryButton}>
+                    历史记录
+                  </Button>
+                )}
+              </View>
             </Card.Content>
           </Card>
 
@@ -324,6 +335,18 @@ export default function DiaryDetailScreen() {
                   <View style={styles.resultSection}>
                     <Text variant="titleMedium" style={styles.resultLabel}>📊 长势分析</Text>
                     <Text variant="bodyMedium" style={styles.resultText}>{aiResult.analysis}</Text>
+                    <Button
+                      mode="text"
+                      icon="pencil"
+                      compact
+                      onPress={() => {
+                        setNote(aiResult.analysis);
+                        setShowAiDialog(false);
+                        setMessage('已填入 Note');
+                      }}
+                      style={styles.applyButton}>
+                      填入 Note
+                    </Button>
                   </View>
 
                   <Divider style={styles.divider} />
@@ -506,6 +529,14 @@ const styles = StyleSheet.create({
   },
   aiButton: {
     backgroundColor: '#254D32',
+    flex: 1,
+  },
+  aiButtonRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  aiHistoryButton: {
+    flex: 1,
   },
   divider: {
     backgroundColor: '#E5E1D8',
