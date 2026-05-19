@@ -318,7 +318,7 @@ export function getBrokerConnectionStatus(brokerUrl: string): MqttConnectionStat
  */
 export function publishDeviceCommand(
   device: Device,
-  action: 'water' | 'capture',
+  action: 'water' | 'capture' | 'light',
   params: Record<string, unknown> = {},
 ): boolean {
   const brokerUrl = toMqttWebSocketUrl(device.mqttUrl);

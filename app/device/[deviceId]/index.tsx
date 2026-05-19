@@ -54,10 +54,11 @@ export default function DeviceDetailScreen() {
 
   const online = isDeviceOnline(device.macAddress);
 
-  const runCommand = async (action: 'water' | 'capture') => {
-    const success = publishDeviceCommand(device, action);
+  const runCommand = async (action: 'water' | 'capture' | 'light') => {
+    const params = action === 'light' ? { r: 255, g: 0, b: 128 } : {};
+    const success = publishDeviceCommand(device, action, params);
     if (success) {
-      setMessage(action === 'water' ? '浇水指令已发送' : '拍照指令已发送');
+      setMessage(action === 'water' ? '浇水指令已发送' : action === 'light' ? '补光指令已发送' : '拍照指令已发送');
     } else {
       setMessage('指令发送失败，请检查 MQTT 连接');
     }
@@ -315,6 +316,9 @@ export default function DeviceDetailScreen() {
             <View style={styles.buttonGrid}>
               <Button mode="contained" onPress={() => runCommand('water')}>
                 浇水
+              </Button>
+              <Button mode="contained" onPress={() => runCommand('light')}>
+                补光
               </Button>
               <Button mode="outlined" onPress={() => runCommand('capture')}>
                 立即拍照
