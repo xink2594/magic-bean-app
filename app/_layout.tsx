@@ -74,6 +74,7 @@ function AppBootstrap() {
       <Stack.Screen name="device/[deviceId]/index" />
       <Stack.Screen name="device/[deviceId]/config" options={{ presentation: 'modal' }} />
       <Stack.Screen name="device/[deviceId]/diary" />
+      <Stack.Screen name="device/[deviceId]/trash" />
       <Stack.Screen name="photo/[recordId]" options={{ presentation: 'card' }} />
       <Stack.Screen name="diary/[recordId]" options={{ presentation: 'card' }} />
     </Stack>

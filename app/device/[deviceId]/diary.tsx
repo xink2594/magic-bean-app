@@ -144,12 +144,26 @@ export default function DiaryGalleryScreen() {
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
       <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          {device?.name ?? '成长日记'}
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          {records.length > 0 ? `共 ${records.length} 张照片` : ''}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text variant="headlineMedium" style={styles.title}>
+            {device?.name ?? '成长日记'}
+          </Text>
+          <Text variant="bodyMedium" style={styles.subtitle}>
+            {records.length > 0 ? `共 ${records.length} 张照片` : ''}
+          </Text>
+        </View>
+        <IconButton
+          icon="delete-outline"
+          size={24}
+          iconColor="#163020"
+          mode="contained-tonal"
+          onPress={() =>
+            router.push({
+              pathname: '/device/[deviceId]/trash',
+              params: { deviceId: deviceId ?? '' },
+            } as never)
+          }
+        />
       </View>
 
       <FlatList
@@ -222,7 +236,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F1E8',
   },
   header: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
     paddingTop: 16,
     paddingBottom: 12,
     gap: 4,

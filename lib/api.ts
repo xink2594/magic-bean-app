@@ -142,6 +142,29 @@ export async function fetchDiaryList(
   }
 }
 
+// 获取回收站日记列表
+export async function fetchDiaryTrash(
+  deviceId: string,
+  page: number = 1,
+  pageSize: number = 20,
+  deviceBackendUrl?: string,
+): Promise<DiaryListResponse | null> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const url = `/api/diary/trash?deviceId=${deviceId}&page=${page}&pageSize=${pageSize}`;
+    const response = await client.get<ApiResponse<DiaryListResponse>>(url);
+
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[API] fetchDiaryTrash error:', error);
+    return null;
+  }
+}
+
 // 获取设备历史数据
 export async function fetchHistoryData(
   deviceId: string,
