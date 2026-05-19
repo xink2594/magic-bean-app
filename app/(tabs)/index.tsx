@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, Card, Chip, FAB, Text } from 'react-native-paper';
+import { Button, Card, Chip, Dialog, FAB, IconButton, Portal, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { fetchDeviceLatestData } from '@/lib/api';
+import { decodeDeviceShare } from '@/lib/share';
 import { DeviceLatestData } from '@/lib/types';
 import { useAppStore } from '@/lib/store';
 
@@ -13,9 +16,73 @@ export default function DashboardScreen() {
   const getLiveStats = useAppStore((state) => state.getLiveStats);
   const isDeviceOnline = useAppStore((state) => state.isDeviceOnline);
   const updateLiveStats = useAppStore((state) => state.updateLiveStats);
+  const addProvisionedDevice = useAppStore((state) => state.addProvisionedDevice);
 
   const [refreshing, setRefreshing] = useState(false);
   const [apiData, setApiData] = useState<Record<string, DeviceLatestData>>({});
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [message, setMessage] = useState('');
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+
+  const menuAnim = useRef(new Animated.Value(0)).current;
+
+  const toggleMenu = () => {
+    const toValue = menuOpen ? 0 : 1;
+    Animated.spring(menuAnim, {
+      toValue,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 12,
+    }).start();
+    setMenuOpen(!menuOpen);
+  };
+
+  const closeMenu = () => {
+    if (!menuOpen) return;
+    Animated.spring(menuAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
+    setMenuOpen(false);
+  };
+
+  const handleClipboardImport = async () => {
+    closeMenu();
+    const text = await Clipboard.getStringAsync();
+    const decoded = decodeDeviceShare(text);
+    if (!decoded) {
+      setMessage('剪贴板内容无效，请先复制分享码');
+      return;
+    }
+    await addProvisionedDevice(decoded);
+    setMessage(`已导入设备：${decoded.name}`);
+  };
+
+  const handleScanImport = async () => {
+    closeMenu();
+    if (!cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) {
+        setMessage('需要相机权限才能扫码');
+        return;
+      }
+    }
+    setScanned(false);
+    setShowScanner(true);
+  };
+
+  const handleBarcodeScanned = useCallback(async (result: { data: string }) => {
+    if (scanned) return;
+    setScanned(true);
+    setShowScanner(false);
+
+    const decoded = decodeDeviceShare(result.data);
+    if (!decoded) {
+      setMessage('二维码内容无效');
+      return;
+    }
+    await addProvisionedDevice(decoded);
+    setMessage(`已导入设备：${decoded.name}`);
+  }, [scanned, addProvisionedDevice]);
 
   const heroText = useMemo(() => {
     if (!devices.length) {
@@ -60,6 +127,17 @@ export default function DashboardScreen() {
     await fetchData();
     setRefreshing(false);
   }, [fetchData]);
+
+  const menuItemTranslateY = (index: number) =>
+    menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -(56 + 8) * (index + 1)] });
+
+  const menuItemOpacity = menuAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0, 1] });
+
+  const menuItems = [
+    { label: 'AP 配网', icon: 'wifi', onPress: () => { closeMenu(); router.push({ pathname: '/provision' } as never); } },
+    { label: '剪贴板导入', icon: 'clipboard-outline', onPress: handleClipboardImport },
+    { label: '扫码导入', icon: 'qrcode-scan', onPress: handleScanImport },
+  ];
 
   return (
     <SafeAreaView style={styles.page} edges={['top']}>
@@ -155,11 +233,64 @@ export default function DashboardScreen() {
         })}
       </ScrollView>
 
+      {menuOpen && (
+        <View style={styles.menuOverlay} onTouchStart={closeMenu} />
+      )}
+
+      {menuItems.map((item, index) => (
+        <Animated.View
+          key={item.label}
+          style={[
+            styles.menuItem,
+            {
+              opacity: menuItemOpacity,
+              transform: [{ translateY: menuItemTranslateY(index) }],
+            },
+          ]}>
+          <View style={styles.menuItemInner}>
+            <Text variant="labelLarge" style={styles.menuLabel}>{item.label}</Text>
+            <IconButton
+              icon={item.icon}
+              size={24}
+              mode="contained-tonal"
+              onPress={item.onPress}
+              style={styles.menuIcon}
+            />
+          </View>
+        </Animated.View>
+      ))}
+
       <FAB
-        icon="plus"
+        icon={menuOpen ? 'close' : 'plus'}
         style={styles.fab}
-        onPress={() => router.push({ pathname: '/provision' } as never)}
+        onPress={toggleMenu}
       />
+
+      <Portal>
+        <Dialog visible={showScanner} onDismiss={() => setShowScanner(false)} style={styles.scannerDialog}>
+          <Dialog.Title>扫码导入设备</Dialog.Title>
+          <Dialog.Content style={styles.scannerContent}>
+            <View style={styles.cameraWrap}>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                onBarcodeScanned={handleBarcodeScanned}
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              />
+            </View>
+            <Text variant="bodySmall" style={styles.scannerHint}>
+              将二维码对准扫描框
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowScanner(false)}>取消</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
+        {message}
+      </Snackbar>
     </SafeAreaView>
   );
 }
@@ -250,5 +381,54 @@ const styles = StyleSheet.create({
     right: 20,
     bottom: 26,
     backgroundColor: '#E89B5C',
+  },
+  menuOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  menuItem: {
+    position: 'absolute',
+    right: 20,
+    bottom: 26,
+  },
+  menuItemInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  menuLabel: {
+    backgroundColor: '#FFFDF8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    color: '#163020',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  menuIcon: {
+    backgroundColor: '#FFFDF8',
+  },
+  scannerDialog: {
+    backgroundColor: '#FFFDF8',
+    maxHeight: '80%',
+  },
+  scannerContent: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  cameraWrap: {
+    width: 260,
+    height: 260,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  scannerHint: {
+    color: '#617062',
   },
 });

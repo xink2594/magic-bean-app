@@ -4,9 +4,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button, Card, Chip, Dialog, IconButton, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-gifted-charts';
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
 
 import { fetchHistoryData } from '@/lib/api';
 import { connectToDevice, publishDeviceCommand } from '@/lib/mqtt-data';
+import { encodeDeviceShare } from '@/lib/share';
 import { useAppStore } from '@/lib/store';
 import { HistoryDataItem } from '@/lib/types';
 
@@ -23,6 +26,7 @@ export default function DeviceDetailScreen() {
   const [selectedMetric, setSelectedMetric] = useState<'temp' | 'airHumidity' | 'soilHumidity'>('temp');
   const [showWaterDialog, setShowWaterDialog] = useState(false);
   const [showLightDialog, setShowLightDialog] = useState(false);
+  const [showQrDialog, setShowQrDialog] = useState(false);
   const waterConfig = useAppStore((state) => state.waterConfig);
   const lightConfig = useAppStore((state) => state.lightConfig);
   const saveWaterConfigStore = useAppStore((state) => state.saveWaterConfig);
@@ -434,9 +438,6 @@ export default function DeviceDetailScreen() {
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
             <Text variant="titleMedium">历史记录</Text>
-            <Text variant="bodyMedium" style={styles.subtitle}>
-              成长日记默认保存在本地 SQLite，只有在你主动诊断或同步时才会访问网络。
-            </Text>
             <Button
               mode="contained"
               onPress={() =>
@@ -453,6 +454,26 @@ export default function DeviceDetailScreen() {
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
             <Text variant="titleMedium">设备管理</Text>
+            <View style={styles.controlRow}>
+              <Button
+                mode="outlined"
+                icon="content-copy"
+                style={styles.controlButton}
+                onPress={async () => {
+                  const code = encodeDeviceShare(device);
+                  await Clipboard.setStringAsync(code);
+                  setMessage('已复制分享码');
+                }}>
+                复制分享码
+              </Button>
+              <Button
+                mode="outlined"
+                icon="qrcode"
+                style={styles.controlButton}
+                onPress={() => setShowQrDialog(true)}>
+                生成二维码
+              </Button>
+            </View>
             <Button
               mode="outlined"
               buttonColor="#FFF4F2"
@@ -600,6 +621,24 @@ export default function DeviceDetailScreen() {
             <Button onPress={handleSaveLight}>保存</Button>
           </Dialog.Actions>
         </Dialog>
+
+        {/* 二维码分享 */}
+        <Dialog visible={showQrDialog} onDismiss={() => setShowQrDialog(false)} style={styles.dialogStyle}>
+          <Dialog.Title>分享设备</Dialog.Title>
+          <Dialog.Content style={styles.qrContent}>
+            <QRCode
+              value={encodeDeviceShare(device)}
+              size={220}
+              backgroundColor="#FFFDF8"
+            />
+            <Text variant="bodySmall" style={styles.qrHint}>
+              扫描二维码即可导入此设备
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowQrDialog(false)}>关闭</Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
@@ -721,6 +760,14 @@ const styles = StyleSheet.create({
   },
   dialogBody: {
     paddingHorizontal: 24,
+  },
+  qrContent: {
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 16,
+  },
+  qrHint: {
+    color: '#617062',
   },
   configLabel: {
     color: '#617062',
