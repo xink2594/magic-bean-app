@@ -421,6 +421,9 @@ export default function DeviceDetailScreen() {
             <Button mode="outlined" onPress={() => publishDeviceCommand(device, 'capture', {})}>
               立即拍照
             </Button>
+            <Button mode="outlined" icon="download" onPress={() => publishDeviceCommand(device, 'fetch', {})}>
+              读取
+            </Button>
           </Card.Content>
         </Card>
 
