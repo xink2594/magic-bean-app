@@ -418,12 +418,14 @@ export default function DeviceDetailScreen() {
                 onPress={openLightDialog}
               />
             </View>
-            <Button mode="outlined" onPress={() => publishDeviceCommand(device, 'capture', {})}>
-              立即拍照
-            </Button>
-            <Button mode="outlined" icon="download" onPress={() => publishDeviceCommand(device, 'fetch', {})}>
-              读取
-            </Button>
+            <View style={styles.controlRow}>
+              <Button mode="outlined" icon="camera" onPress={() => publishDeviceCommand(device, 'capture', {})} style={styles.controlButton}>
+                拍照
+              </Button>
+              <Button mode="outlined" icon="download" onPress={() => { publishDeviceCommand(device, 'fetch', {}); setMessage('读取指令已发送'); }} style={styles.controlButton}>
+                读取
+              </Button>
+            </View>
           </Card.Content>
         </Card>
 
