@@ -52,13 +52,15 @@ export default function DeviceDetailScreen() {
     setShowLightDialog(false);
   };
 
-  const lightState = useAppStore((state) => state.getLightState(device?.macAddress ?? ''));
-  const lightIsOn = lightState?.state === 'on';
-
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
     [deviceId, devices],
   );
+
+  const lightStateMap = useAppStore((state) => state.lightState);
+  const lightState = device ? (lightStateMap[device.macAddress.toUpperCase()] ?? null) : null;
+  const lightIsOn = lightState?.state === 'on';
+
   const stats = getLiveStats(deviceId ?? '');
 
   // 获取 MQTT 连接状态
@@ -371,7 +373,19 @@ export default function DeviceDetailScreen() {
 
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
-            <Text variant="titleMedium">快捷控制</Text>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleMedium">快捷控制</Text>
+              <IconButton
+                icon="power"
+                size={20}
+                mode="contained-tonal"
+                iconColor="#B3261E"
+                onPress={() => {
+                  publishDeviceCommand(device, 'light', { r: 0, g: 0, b: 0 });
+                  setMessage('已关闭所有元件');
+                }}
+              />
+            </View>
             <View style={styles.controlRow}>
               <Button
                 mode="outlined"
@@ -391,9 +405,11 @@ export default function DeviceDetailScreen() {
               <Button
                 mode={lightIsOn ? 'contained' : 'outlined'}
                 onPress={sendLightCommand}
-                style={[styles.controlButton, lightIsOn && { backgroundColor: '#1B5E20' }]}
+                style={styles.controlButton}
+                buttonColor={lightIsOn ? '#2C6E49' : undefined}
+                textColor={lightIsOn ? '#fff' : undefined}
                 icon="lightbulb">
-                补光
+                补光 {lightIsOn ? '(ON)' : ''}
               </Button>
               <IconButton
                 icon="cog-outline"
@@ -675,6 +691,11 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 14,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   buttonGrid: {
     gap: 12,
