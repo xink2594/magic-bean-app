@@ -1,10 +1,11 @@
 import mqtt, { MqttClient } from 'mqtt';
 
-import { Device, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
+import { Device, MqttSensorData, MqttConnectionStatus, LightData } from '@/lib/types';
 
 type ConnectionStatusCallback = (brokerUrl: string, status: MqttConnectionStatus) => void;
 type SensorDataCallback = (macAddress: string, data: MqttSensorData) => void;
 type PresenceCallback = (macAddress: string, isOnline: boolean) => void;
+type LightDataCallback = (macAddress: string, data: LightData) => void;
 
 type DataBrokerRuntime = {
   client: MqttClient;
@@ -16,6 +17,7 @@ const dataRuntimes = new Map<string, DataBrokerRuntime>();
 let onSensorDataCallback: SensorDataCallback | null = null;
 let onConnectionStatusCallback: ConnectionStatusCallback | null = null;
 let onPresenceCallback: PresenceCallback | null = null;
+let onLightDataCallback: LightDataCallback | null = null;
 
 /**
  * 设置传感器数据回调
@@ -36,6 +38,13 @@ export function setConnectionStatusCallback(callback: ConnectionStatusCallback) 
  */
 export function setPresenceCallback(callback: PresenceCallback) {
   onPresenceCallback = callback;
+}
+
+/**
+ * 设置灯光状态回调
+ */
+export function setLightDataCallback(callback: LightDataCallback) {
+  onLightDataCallback = callback;
 }
 
 /**
@@ -92,6 +101,7 @@ export function connectToDevice(device: Device): boolean {
       if (device.mqttTopic) {
         existingRuntime.topics.add(device.mqttTopic);
       }
+      existingRuntime.topics.add(`plant/${device.macAddress.toUpperCase()}/light`);
       return true;
     }
     // error 或 disconnected 状态，继续创建新连接
@@ -131,7 +141,21 @@ export function connectToDevice(device: Device): boolean {
         } catch {
           onPresenceCallback(statusMac, false);
         }
+        return;
       }
+
+      // 尝试从 light 主题格式解析
+      const lightMac = extractMacAddressFromLightTopic(topic);
+      if (lightMac && onLightDataCallback) {
+        try {
+          const parsed = JSON.parse(payload.toString()) as LightData;
+          onLightDataCallback(lightMac, parsed);
+        } catch (error) {
+          console.warn('[MQTT Data] Failed to parse light data:', topic, error);
+        }
+        return;
+      }
+
       return;
     }
 
@@ -181,6 +205,7 @@ export function connectToDevice(device: Device): boolean {
   if (device.mqttTopic) {
     topics.add(device.mqttTopic);
   }
+  topics.add(`plant/${device.macAddress.toUpperCase()}/light`);
 
   const runtime: DataBrokerRuntime = {
     client,
@@ -199,6 +224,14 @@ export function connectToDevice(device: Device): boolean {
 function extractMacAddressFromStatusTopic(topic: string): string {
   const segments = topic.split('/');
   if (segments.length >= 3 && segments[0] === 'plant' && segments[2] === 'status') {
+    return segments[1];
+  }
+  return '';
+}
+
+function extractMacAddressFromLightTopic(topic: string): string {
+  const segments = topic.split('/');
+  if (segments.length >= 3 && segments[0] === 'plant' && segments[2] === 'light') {
     return segments[1];
   }
   return '';
@@ -230,6 +263,15 @@ function subscribeDeviceTopics(brokerUrl: string, device: Device) {
       runtime.client.subscribe(device.mqttTopic);
     }
     runtime.topics.add(device.mqttTopic);
+  }
+
+  // 订阅 light 主题
+  const lightTopic = `plant/${mac}/light`;
+  if (!runtime.topics.has(lightTopic)) {
+    if (runtime.status === 'connected') {
+      runtime.client.subscribe(lightTopic);
+    }
+    runtime.topics.add(lightTopic);
   }
 }
 
@@ -318,7 +360,7 @@ export function getBrokerConnectionStatus(brokerUrl: string): MqttConnectionStat
  */
 export function publishDeviceCommand(
   device: Device,
-  action: 'water' | 'capture' | 'light',
+  action: string,
   params: Record<string, unknown> = {},
 ): boolean {
   const brokerUrl = toMqttWebSocketUrl(device.mqttUrl);

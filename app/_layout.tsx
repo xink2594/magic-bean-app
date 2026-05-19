@@ -6,7 +6,7 @@ import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 
-import { setSensorDataCallback, setConnectionStatusCallback, setPresenceCallback, disconnectAllClients } from '@/lib/mqtt-data';
+import { setSensorDataCallback, setConnectionStatusCallback, setPresenceCallback, setLightDataCallback, disconnectAllClients } from '@/lib/mqtt-data';
 import { useAppStore } from '@/lib/store';
 
 const plantTheme = {
@@ -32,6 +32,7 @@ function AppBootstrap() {
   const setDevicePresence = useAppStore((state) => state.setDevicePresence);
   const setSensorDataFromMqtt = useAppStore((state) => state.setSensorDataFromMqtt);
   const setMqttConnectionStatus = useAppStore((state) => state.setMqttConnectionStatus);
+  const setLightState = useAppStore((state) => state.setLightState);
 
   useEffect(() => {
     hydrate();
@@ -50,7 +51,11 @@ function AppBootstrap() {
     setPresenceCallback((macAddress, isOnline) => {
       setDevicePresence(macAddress, isOnline);
     });
-  }, [setSensorDataFromMqtt, setMqttConnectionStatus, setDevicePresence]);
+
+    setLightDataCallback((macAddress, data) => {
+      setLightState(macAddress, data);
+    });
+  }, [setSensorDataFromMqtt, setMqttConnectionStatus, setDevicePresence, setLightState]);
 
   if (!ready) {
     return (

@@ -22,7 +22,20 @@ export default function DeviceDetailScreen() {
   const [historyData, setHistoryData] = useState<HistoryDataItem[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<'temp' | 'airHumidity' | 'soilHumidity'>('temp');
   const [showWaterDialog, setShowWaterDialog] = useState(false);
+  const [showLightDialog, setShowLightDialog] = useState(false);
+  const [waterActionMode, setWaterActionMode] = useState<'default' | 'custom'>('default');
+  const [waterActionType, setWaterActionType] = useState<'water' | 'led_water'>('water');
+  const [waterDurationMode, setWaterDurationMode] = useState<'default' | 'custom'>('default');
   const [waterDuration, setWaterDuration] = useState('5');
+  const [lightRMode, setLightRMode] = useState<'default' | 'custom'>('default');
+  const [lightGMode, setLightGMode] = useState<'default' | 'custom'>('default');
+  const [lightBMode, setLightBMode] = useState<'default' | 'custom'>('default');
+  const [lightR, setLightR] = useState('255');
+  const [lightG, setLightG] = useState('0');
+  const [lightB, setLightB] = useState('128');
+
+  const lightState = useAppStore((state) => state.getLightState(device?.macAddress ?? ''));
+  const lightIsOn = lightState?.state === 'on';
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
@@ -56,24 +69,42 @@ export default function DeviceDetailScreen() {
 
   const online = isDeviceOnline(device.macAddress);
 
-  const runCommand = async (action: 'capture' | 'light') => {
-    const params = action === 'light' ? { r: 255, g: 0, b: 128 } : {};
-    const success = publishDeviceCommand(device, action, params);
-    if (success) {
-      setMessage(action === 'light' ? '补光指令已发送' : '拍照指令已发送');
-    } else {
-      setMessage('指令发送失败，请检查 MQTT 连接');
-    }
-  };
-
   const handleWaterConfirm = () => {
     const seconds = Math.max(5, Math.min(60, parseInt(waterDuration, 10) || 5));
     setWaterDuration(String(seconds));
     setShowWaterDialog(false);
 
-    const success = publishDeviceCommand(device, 'water', { set_time: seconds });
+    const action = waterActionMode === 'default' ? 'water' : waterActionType;
+    const payload: Record<string, unknown> = { set_time: seconds };
+    if (action === 'led_water') {
+      payload.r = 0;
+      payload.g = 100;
+      payload.b = 255;
+    }
+
+    const success = publishDeviceCommand(device, action, payload);
     if (success) {
       setMessage(`浇水指令已发送，持续 ${seconds} 秒`);
+    } else {
+      setMessage('指令发送失败，请检查 MQTT 连接');
+    }
+  };
+
+  const handleLightAction = () => {
+    let payload: Record<string, unknown>;
+
+    if (lightIsOn) {
+      payload = { r: 0, g: 0, b: 0 };
+    } else {
+      const r = lightRMode === 'default' ? 255 : (parseInt(lightR, 10) || 0);
+      const g = lightGMode === 'default' ? 0 : (parseInt(lightG, 10) || 0);
+      const b = lightBMode === 'default' ? 128 : (parseInt(lightB, 10) || 0);
+      payload = { r, g, b };
+    }
+
+    const success = publishDeviceCommand(device, 'light', payload);
+    if (success) {
+      setMessage(lightIsOn ? '补光已关闭' : '补光指令已发送');
     } else {
       setMessage('指令发送失败，请检查 MQTT 连接');
     }
@@ -328,17 +359,39 @@ export default function DeviceDetailScreen() {
         <Card style={styles.card}>
           <Card.Content style={styles.section}>
             <Text variant="titleMedium">快捷控制</Text>
-            <View style={styles.buttonGrid}>
-              <Button mode="contained" onPress={() => { setWaterDuration('5'); setShowWaterDialog(true); }}>
+            <View style={styles.controlRow}>
+              <Button
+                mode="outlined"
+                onPress={() => { setWaterDuration('5'); setWaterActionMode('default'); setWaterDurationMode('default'); setWaterActionType('water'); setShowWaterDialog(true); }}
+                style={styles.controlButton}
+                icon="water">
                 浇水
               </Button>
-              <Button mode="contained" onPress={() => runCommand('light')}>
+              <IconButton
+                icon="cog-outline"
+                size={20}
+                mode="contained-tonal"
+                onPress={() => { setWaterDuration('5'); setWaterActionMode('default'); setWaterDurationMode('default'); setWaterActionType('water'); setShowWaterDialog(true); }}
+              />
+            </View>
+            <View style={styles.controlRow}>
+              <Button
+                mode={lightIsOn ? 'contained' : 'outlined'}
+                onPress={handleLightAction}
+                style={[styles.controlButton, lightIsOn && { backgroundColor: '#1B5E20' }]}
+                icon="lightbulb">
                 补光
               </Button>
-              <Button mode="outlined" onPress={() => runCommand('capture')}>
-                立即拍照
-              </Button>
+              <IconButton
+                icon="cog-outline"
+                size={20}
+                mode="contained-tonal"
+                onPress={() => setShowLightDialog(true)}
+              />
             </View>
+            <Button mode="outlined" onPress={() => publishDeviceCommand(device, 'capture', {})}>
+              立即拍照
+            </Button>
           </Card.Content>
         </Card>
 
@@ -376,24 +429,167 @@ export default function DeviceDetailScreen() {
       </ScrollView>
 
       <Portal>
-        <Dialog visible={showWaterDialog} onDismiss={() => setShowWaterDialog(false)} style={{ backgroundColor: '#FFFDF8' }}>
-          <Dialog.Title>浇水时长</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium" style={{ color: '#617062', marginBottom: 16 }}>
-              请选择浇水持续时间（5 ~ 60 秒）
-            </Text>
-            <TextInput
-              mode="outlined"
-              keyboardType="number-pad"
-              value={waterDuration}
-              onChangeText={(text) => setWaterDuration(text.replace(/[^0-9]/g, ''))}
-              right={<TextInput.Affix text="秒" />}
-              style={{ backgroundColor: '#FFFDF8' }}
-            />
-          </Dialog.Content>
+        {/* 浇水配置 */}
+        <Dialog visible={showWaterDialog} onDismiss={() => setShowWaterDialog(false)} style={styles.dialogStyle}>
+          <Dialog.Title>浇水配置</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView style={styles.dialogBody}>
+              <Text variant="titleSmall" style={styles.configLabel}>动作类型</Text>
+              <View style={styles.configOptions}>
+                <Chip
+                  selected={waterActionMode === 'default'}
+                  onPress={() => setWaterActionMode('default')}
+                  style={styles.configChip}>
+                  默认 (water)
+                </Chip>
+                <Chip
+                  selected={waterActionMode === 'custom'}
+                  onPress={() => setWaterActionMode('custom')}
+                  style={styles.configChip}>
+                  自定义
+                </Chip>
+              </View>
+              {waterActionMode === 'custom' && (
+                <View style={styles.configOptions}>
+                  <Chip
+                    selected={waterActionType === 'water'}
+                    onPress={() => setWaterActionType('water')}
+                    style={styles.configChip}>
+                    water
+                  </Chip>
+                  <Chip
+                    selected={waterActionType === 'led_water'}
+                    onPress={() => setWaterActionType('led_water')}
+                    style={styles.configChip}>
+                    led_water
+                  </Chip>
+                </View>
+              )}
+
+              <Text variant="titleSmall" style={styles.configLabel}>持续时间</Text>
+              <View style={styles.configOptions}>
+                <Chip
+                  selected={waterDurationMode === 'default'}
+                  onPress={() => setWaterDurationMode('default')}
+                  style={styles.configChip}>
+                  默认 (5 秒)
+                </Chip>
+                <Chip
+                  selected={waterDurationMode === 'custom'}
+                  onPress={() => setWaterDurationMode('custom')}
+                  style={styles.configChip}>
+                  自定义
+                </Chip>
+              </View>
+              {waterDurationMode === 'custom' && (
+                <TextInput
+                  mode="outlined"
+                  keyboardType="number-pad"
+                  value={waterDuration}
+                  onChangeText={(text) => setWaterDuration(text.replace(/[^0-9]/g, ''))}
+                  right={<TextInput.Affix text="秒" />}
+                  dense
+                  style={styles.configInput}
+                />
+              )}
+            </ScrollView>
+          </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowWaterDialog(false)}>取消</Button>
             <Button onPress={handleWaterConfirm}>确认发送</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* 补光配置 */}
+        <Dialog visible={showLightDialog} onDismiss={() => setShowLightDialog(false)} style={styles.dialogStyle}>
+          <Dialog.Title>补光配置</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView style={styles.dialogBody}>
+              <Text variant="titleSmall" style={styles.configLabel}>R (红)</Text>
+              <View style={styles.configOptions}>
+                <Chip
+                  selected={lightRMode === 'default'}
+                  onPress={() => setLightRMode('default')}
+                  style={styles.configChip}>
+                  默认 (255)
+                </Chip>
+                <Chip
+                  selected={lightRMode === 'custom'}
+                  onPress={() => setLightRMode('custom')}
+                  style={styles.configChip}>
+                  自定义
+                </Chip>
+              </View>
+              {lightRMode === 'custom' && (
+                <TextInput
+                  mode="outlined"
+                  keyboardType="number-pad"
+                  value={lightR}
+                  onChangeText={(text) => setLightR(text.replace(/[^0-9]/g, ''))}
+                  right={<TextInput.Affix text="0-255" />}
+                  dense
+                  style={styles.configInput}
+                />
+              )}
+
+              <Text variant="titleSmall" style={styles.configLabel}>G (绿)</Text>
+              <View style={styles.configOptions}>
+                <Chip
+                  selected={lightGMode === 'default'}
+                  onPress={() => setLightGMode('default')}
+                  style={styles.configChip}>
+                  默认 (0)
+                </Chip>
+                <Chip
+                  selected={lightGMode === 'custom'}
+                  onPress={() => setLightGMode('custom')}
+                  style={styles.configChip}>
+                  自定义
+                </Chip>
+              </View>
+              {lightGMode === 'custom' && (
+                <TextInput
+                  mode="outlined"
+                  keyboardType="number-pad"
+                  value={lightG}
+                  onChangeText={(text) => setLightG(text.replace(/[^0-9]/g, ''))}
+                  right={<TextInput.Affix text="0-255" />}
+                  dense
+                  style={styles.configInput}
+                />
+              )}
+
+              <Text variant="titleSmall" style={styles.configLabel}>B (蓝)</Text>
+              <View style={styles.configOptions}>
+                <Chip
+                  selected={lightBMode === 'default'}
+                  onPress={() => setLightBMode('default')}
+                  style={styles.configChip}>
+                  默认 (128)
+                </Chip>
+                <Chip
+                  selected={lightBMode === 'custom'}
+                  onPress={() => setLightBMode('custom')}
+                  style={styles.configChip}>
+                  自定义
+                </Chip>
+              </View>
+              {lightBMode === 'custom' && (
+                <TextInput
+                  mode="outlined"
+                  keyboardType="number-pad"
+                  value={lightB}
+                  onChangeText={(text) => setLightB(text.replace(/[^0-9]/g, ''))}
+                  right={<TextInput.Affix text="0-255" />}
+                  dense
+                  style={styles.configInput}
+                />
+              )}
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setShowLightDialog(false)}>取消</Button>
+            <Button onPress={() => { setShowLightDialog(false); handleLightAction(); }}>确认发送</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -497,6 +693,39 @@ const styles = StyleSheet.create({
   },
   buttonGrid: {
     gap: 12,
+  },
+  controlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  controlButton: {
+    flex: 1,
+  },
+  dialogStyle: {
+    backgroundColor: '#FFFDF8',
+    maxHeight: '70%',
+  },
+  dialogBody: {
+    paddingHorizontal: 24,
+  },
+  configLabel: {
+    color: '#617062',
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  configOptions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  configChip: {
+    backgroundColor: '#F5F1E8',
+  },
+  configInput: {
+    backgroundColor: '#FFFDF8',
+    marginBottom: 8,
   },
   mqttStatusRow: {
     flexDirection: 'row',

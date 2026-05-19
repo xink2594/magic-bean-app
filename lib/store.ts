@@ -10,7 +10,7 @@ import {
   saveConfig,
   updateDeviceMqttConfig,
 } from '@/lib/database';
-import { AppConfig, Device, LiveStats, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
+import { AppConfig, Device, LiveStats, LightData, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
 
 type AppState = {
   ready: boolean;
@@ -19,6 +19,7 @@ type AppState = {
   liveStats: Record<string, LiveStats>;
   devicePresence: Record<string, boolean>;
   mqttConnectionStatus: Record<string, MqttConnectionStatus>;
+  lightState: Record<string, LightData>;
   hydrate: () => Promise<void>;
   saveSettings: (config: AppConfig) => Promise<void>;
   clearAppData: () => Promise<void>;
@@ -32,6 +33,8 @@ type AppState = {
   setSensorDataFromMqtt: (macAddress: string, data: MqttSensorData) => void;
   setMqttConnectionStatus: (brokerUrl: string, status: MqttConnectionStatus) => void;
   getMqttConnectionStatus: (brokerUrl: string) => MqttConnectionStatus;
+  setLightState: (macAddress: string, data: LightData) => void;
+  getLightState: (macAddress: string) => LightData | null;
 };
 
 const defaultStats: LiveStats = {
@@ -54,6 +57,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   liveStats: {},
   devicePresence: {},
   mqttConnectionStatus: {},
+  lightState: {},
   hydrate: async () => {
     await initDatabase();
     const [config, devices] = await Promise.all([getConfig(), getDevices()]);
@@ -166,6 +170,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   getMqttConnectionStatus: (brokerUrl) => {
     return get().mqttConnectionStatus[brokerUrl] ?? 'disconnected';
+  },
+  setLightState: (macAddress, data) => {
+    set((state) => ({
+      lightState: {
+        ...state.lightState,
+        [macAddress.toUpperCase()]: data,
+      },
+    }));
+  },
+  getLightState: (macAddress) => {
+    return get().lightState[macAddress.toUpperCase()] ?? null;
   },
 }));
 

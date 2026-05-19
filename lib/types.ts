@@ -38,6 +38,14 @@ export type MqttSensorData = {
   dirt_humidity: number;
 };
 
+// MQTT 灯光状态数据
+export type LightData = {
+  state: 'on' | 'off';
+  r: number;
+  g: number;
+  b: number;
+};
+
 // MQTT 连接状态
 export type MqttConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
