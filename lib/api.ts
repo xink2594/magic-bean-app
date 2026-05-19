@@ -165,6 +165,60 @@ export async function fetchDiaryTrash(
   }
 }
 
+// 上传图片，返回图片 URL
+export async function uploadImage(
+  uri: string,
+  deviceBackendUrl?: string,
+): Promise<string | null> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const formData = new FormData();
+
+    const filename = uri.split('/').pop() ?? `photo_${Date.now()}.jpg`;
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    formData.append('file', { uri, name: filename, type } as unknown as Blob);
+
+    const response = await client.post<ApiResponse<{ url?: string; imageUrl?: string }>>(
+      '/api/image/upload',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data.url ?? response.data.data.imageUrl ?? null;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[API] uploadImage error:', error);
+    return null;
+  }
+}
+
+// 创建手记
+export async function createDiary(
+  deviceId: string,
+  imageUrl: string,
+  note: string = '',
+  deviceBackendUrl?: string,
+): Promise<boolean> {
+  try {
+    const client = getClient(deviceBackendUrl);
+    const response = await client.post<ApiResponse<unknown>>('/api/diary/create', {
+      deviceId,
+      imageUrl,
+      note,
+    });
+
+    return response.data.code === 200;
+  } catch (error) {
+    console.error('[API] createDiary error:', error);
+    return false;
+  }
+}
+
 // 获取设备历史数据
 export async function fetchHistoryData(
   deviceId: string,

@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchDiaryList } from '@/lib/api';
+import { createDiary, fetchDiaryList, uploadImage } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 import { DiaryListItem } from '@/lib/types';
 
@@ -22,6 +22,7 @@ export default function DiaryGalleryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const expandAnim = useRef(new Animated.Value(0)).current;
 
@@ -69,13 +70,34 @@ export default function DiaryGalleryScreen() {
 
   const handleImagePicked = useCallback(async (result: ImagePicker.ImagePickerResult) => {
     if (result.canceled || !result.assets?.[0]?.uri) return;
-    // TODO: 上传图片到后端并刷新列表
-    setMessage('图片已选择，上传功能待实现');
+
     setExpanded(false);
     Animated.spring(expandAnim, { toValue: 0, friction: 6, useNativeDriver: true }).start();
-  }, [expandAnim]);
+
+    const localUri = result.assets[0].uri;
+    setUploading(true);
+    setMessage('正在上传图片...');
+
+    const imageUrl = await uploadImage(localUri, device?.backendUrl);
+    if (!imageUrl) {
+      setUploading(false);
+      setMessage('图片上传失败，请重试');
+      return;
+    }
+
+    const success = await createDiary(macAddress, imageUrl, '', device?.backendUrl);
+    setUploading(false);
+
+    if (success) {
+      setMessage('手记创建成功');
+      fetchData();
+    } else {
+      setMessage('创建手记失败，请重试');
+    }
+  }, [expandAnim, device?.backendUrl, macAddress, fetchData]);
 
   const handleCamera = useCallback(async () => {
+    if (uploading) return;
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       setMessage('需要相机权限才能拍照');
@@ -83,9 +105,10 @@ export default function DiaryGalleryScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
     await handleImagePicked(result);
-  }, [handleImagePicked]);
+  }, [uploading, handleImagePicked]);
 
   const handleAlbum = useCallback(async () => {
+    if (uploading) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       setMessage('需要相册权限才能选择图片');
@@ -93,7 +116,7 @@ export default function DiaryGalleryScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
     await handleImagePicked(result);
-  }, [handleImagePicked]);
+  }, [uploading, handleImagePicked]);
 
   const renderItem = useCallback(({ item, index }: { item: DiaryListItem; index: number }) => {
     const isLeft = index % 2 === 0;
@@ -211,9 +234,10 @@ export default function DiaryGalleryScreen() {
       </Animated.View>
 
       <TouchableOpacity
-        style={styles.mainFab}
-        onPress={toggleExpand}
-        activeOpacity={0.8}>
+        style={[styles.mainFab, uploading && styles.mainFabDisabled]}
+        onPress={uploading ? undefined : toggleExpand}
+        activeOpacity={0.8}
+        disabled={uploading}>
         <Animated.Text
           style={[
             styles.mainFabIcon,
@@ -316,6 +340,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     zIndex: 3,
+  },
+  mainFabDisabled: {
+    opacity: 0.5,
   },
   mainFabIcon: {
     fontSize: 28,
