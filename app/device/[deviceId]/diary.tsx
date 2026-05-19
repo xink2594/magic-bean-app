@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Snackbar, Text } from 'react-native-paper';
+import { IconButton, Snackbar, Text } from 'react-native-paper';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -178,7 +178,7 @@ export default function DiaryGalleryScreen() {
           },
         ]}>
         <TouchableOpacity style={styles.subFabButton} onPress={handleCamera} activeOpacity={0.8}>
-          <Text style={styles.subFabIcon}>📷</Text>
+          <IconButton icon="camera" size={24} iconColor="#163020" style={styles.subFabIconBtn} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -192,7 +192,7 @@ export default function DiaryGalleryScreen() {
           },
         ]}>
         <TouchableOpacity style={styles.subFabButton} onPress={handleAlbum} activeOpacity={0.8}>
-          <Text style={styles.subFabIcon}>🖼️</Text>
+          <IconButton icon="image-multiple" size={24} iconColor="#163020" style={styles.subFabIconBtn} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
   },
-  subFabIcon: {
-    fontSize: 22,
+  subFabIconBtn: {
+    margin: 0,
   },
 });
