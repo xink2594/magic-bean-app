@@ -91,7 +91,9 @@ export default function DeviceDetailScreen() {
 
   const sendWaterCommand = () => {
     const wc = waterConfig;
-    const seconds = Math.max(5, Math.min(60, parseInt(wc.duration, 10) || 5));
+    const seconds = wc.durationMode === 'default'
+      ? 5
+      : Math.max(5, Math.min(60, parseInt(wc.duration, 10) || 5));
     const action = wc.actionMode === 'default' ? 'water' : wc.actionType;
     const payload: Record<string, unknown> = { set_time: seconds };
     if (action === 'led_water') {
