@@ -113,6 +113,8 @@ export default function ProvisionPortalScreen() {
             injectedJavaScriptBeforeContentLoaded={injectedBridge}
             originWhitelist={['*']}
             startInLoadingState
+            androidLayerType="software"
+            mixedContentMode="always"
           />
         </View>
       </View>
