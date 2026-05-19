@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Chip, IconButton, Snackbar, Text } from 'react-native-paper';
+import { Button, Card, Chip, Dialog, IconButton, Portal, Snackbar, Text, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-gifted-charts';
 
@@ -21,6 +21,8 @@ export default function DeviceDetailScreen() {
   const [message, setMessage] = useState('');
   const [historyData, setHistoryData] = useState<HistoryDataItem[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<'temp' | 'airHumidity' | 'soilHumidity'>('temp');
+  const [showWaterDialog, setShowWaterDialog] = useState(false);
+  const [waterDuration, setWaterDuration] = useState('5');
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
@@ -54,11 +56,24 @@ export default function DeviceDetailScreen() {
 
   const online = isDeviceOnline(device.macAddress);
 
-  const runCommand = async (action: 'water' | 'capture' | 'light') => {
+  const runCommand = async (action: 'capture' | 'light') => {
     const params = action === 'light' ? { r: 255, g: 0, b: 128 } : {};
     const success = publishDeviceCommand(device, action, params);
     if (success) {
-      setMessage(action === 'water' ? '浇水指令已发送' : action === 'light' ? '补光指令已发送' : '拍照指令已发送');
+      setMessage(action === 'light' ? '补光指令已发送' : '拍照指令已发送');
+    } else {
+      setMessage('指令发送失败，请检查 MQTT 连接');
+    }
+  };
+
+  const handleWaterConfirm = () => {
+    const seconds = Math.max(5, Math.min(60, parseInt(waterDuration, 10) || 5));
+    setWaterDuration(String(seconds));
+    setShowWaterDialog(false);
+
+    const success = publishDeviceCommand(device, 'water', { set_time: seconds });
+    if (success) {
+      setMessage(`浇水指令已发送，持续 ${seconds} 秒`);
     } else {
       setMessage('指令发送失败，请检查 MQTT 连接');
     }
@@ -314,7 +329,7 @@ export default function DeviceDetailScreen() {
           <Card.Content style={styles.section}>
             <Text variant="titleMedium">快捷控制</Text>
             <View style={styles.buttonGrid}>
-              <Button mode="contained" onPress={() => runCommand('water')}>
+              <Button mode="contained" onPress={() => { setWaterDuration('5'); setShowWaterDialog(true); }}>
                 浇水
               </Button>
               <Button mode="contained" onPress={() => runCommand('light')}>
@@ -359,6 +374,29 @@ export default function DeviceDetailScreen() {
           </Card.Content>
         </Card>
       </ScrollView>
+
+      <Portal>
+        <Dialog visible={showWaterDialog} onDismiss={() => setShowWaterDialog(false)} style={{ backgroundColor: '#FFFDF8' }}>
+          <Dialog.Title>浇水时长</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={{ color: '#617062', marginBottom: 16 }}>
+              请选择浇水持续时间（5 ~ 60 秒）
+            </Text>
+            <TextInput
+              mode="outlined"
+              keyboardType="number-pad"
+              value={waterDuration}
+              onChangeText={(text) => setWaterDuration(text.replace(/[^0-9]/g, ''))}
+              right={<TextInput.Affix text="秒" />}
+              style={{ backgroundColor: '#FFFDF8' }}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowWaterDialog(false)}>取消</Button>
+            <Button onPress={handleWaterConfirm}>确认发送</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
         {message}
