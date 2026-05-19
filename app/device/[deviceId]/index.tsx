@@ -765,7 +765,6 @@ const styles = StyleSheet.create({
   },
   metricButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
   },
   metricChip: {
