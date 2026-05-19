@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Dimensions, FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Dimensions, FlatList, Pressable, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Text } from 'react-native-paper';
+import { Snackbar, Text } from 'react-native-paper';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { fetchDiaryList } from '@/lib/api';
@@ -20,6 +21,9 @@ export default function DiaryGalleryScreen() {
   const [records, setRecords] = useState<DiaryListItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [message, setMessage] = useState('');
+  const expandAnim = useRef(new Animated.Value(0)).current;
 
   const device = useMemo(
     () => devices.find((entry) => entry.id === deviceId),
@@ -51,6 +55,45 @@ export default function DiaryGalleryScreen() {
     await fetchData();
     setRefreshing(false);
   }, [fetchData]);
+
+  const toggleExpand = useCallback(() => {
+    const toValue = expanded ? 0 : 1;
+    Animated.spring(expandAnim, {
+      toValue,
+      friction: 6,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+    setExpanded(!expanded);
+  }, [expanded, expandAnim]);
+
+  const handleImagePicked = useCallback(async (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    // TODO: 上传图片到后端并刷新列表
+    setMessage('图片已选择，上传功能待实现');
+    setExpanded(false);
+    Animated.spring(expandAnim, { toValue: 0, friction: 6, useNativeDriver: true }).start();
+  }, [expandAnim]);
+
+  const handleCamera = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      setMessage('需要相机权限才能拍照');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 });
+    await handleImagePicked(result);
+  }, [handleImagePicked]);
+
+  const handleAlbum = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setMessage('需要相册权限才能选择图片');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    await handleImagePicked(result);
+  }, [handleImagePicked]);
 
   const renderItem = useCallback(({ item, index }: { item: DiaryListItem; index: number }) => {
     const isLeft = index % 2 === 0;
@@ -122,6 +165,53 @@ export default function DiaryGalleryScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {expanded && <Pressable style={styles.overlay} onPress={toggleExpand} />}
+
+      <Animated.View
+        style={[
+          styles.subFab,
+          styles.subFabCamera,
+          {
+            opacity: expandAnim,
+            transform: [{ translateY: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -76] }) }],
+          },
+        ]}>
+        <TouchableOpacity style={styles.subFabButton} onPress={handleCamera} activeOpacity={0.8}>
+          <Text style={styles.subFabIcon}>📷</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.subFab,
+          styles.subFabAlbum,
+          {
+            opacity: expandAnim,
+            transform: [{ translateY: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -140] }) }],
+          },
+        ]}>
+        <TouchableOpacity style={styles.subFabButton} onPress={handleAlbum} activeOpacity={0.8}>
+          <Text style={styles.subFabIcon}>🖼️</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      <TouchableOpacity
+        style={styles.mainFab}
+        onPress={toggleExpand}
+        activeOpacity={0.8}>
+        <Animated.Text
+          style={[
+            styles.mainFabIcon,
+            { transform: [{ rotate: expandAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }] },
+          ]}>
+          +
+        </Animated.Text>
+      </TouchableOpacity>
+
+      <Snackbar visible={Boolean(message)} onDismiss={() => setMessage('')} duration={2400}>
+        {message}
+      </Snackbar>
     </SafeAreaView>
   );
 }
@@ -189,5 +279,56 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     color: '#617062',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  mainFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 26,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2C6E49',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    zIndex: 3,
+  },
+  mainFabIcon: {
+    fontSize: 28,
+    color: '#F7F3E9',
+    fontWeight: '300',
+    lineHeight: 30,
+  },
+  subFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 26,
+    zIndex: 2,
+  },
+  subFabCamera: {},
+  subFabAlbum: {},
+  subFabButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFFDF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  subFabIcon: {
+    fontSize: 22,
   },
 });
