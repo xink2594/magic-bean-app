@@ -18,11 +18,27 @@ export type PlantRecord = {
   timestamp: string;
 };
 
+export type WaterConfig = {
+  actionMode: 'default' | 'custom';
+  actionType: 'water' | 'led_water';
+  durationMode: 'default' | 'custom';
+  duration: string;
+};
+
+export type LightConfig = {
+  rgbMode: 'default' | 'custom';
+  r: string;
+  g: string;
+  b: string;
+};
+
 export type AppConfig = {
   backendUrl: string;
   llmStatus: string;
   webdavUrl: string;
   syncEnabled: boolean;
+  waterConfig: string;
+  lightConfig: string;
 };
 
 export type LiveStats = {

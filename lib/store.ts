@@ -10,7 +10,7 @@ import {
   saveConfig,
   updateDeviceMqttConfig,
 } from '@/lib/database';
-import { AppConfig, Device, LiveStats, LightData, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
+import { AppConfig, Device, LiveStats, LightData, WaterConfig, LightConfig, MqttSensorData, MqttConnectionStatus } from '@/lib/types';
 
 type AppState = {
   ready: boolean;
@@ -20,8 +20,12 @@ type AppState = {
   devicePresence: Record<string, boolean>;
   mqttConnectionStatus: Record<string, MqttConnectionStatus>;
   lightState: Record<string, LightData>;
+  waterConfig: WaterConfig;
+  lightConfig: LightConfig;
   hydrate: () => Promise<void>;
   saveSettings: (config: AppConfig) => Promise<void>;
+  saveWaterConfig: (config: WaterConfig) => Promise<void>;
+  saveLightConfig: (config: LightConfig) => Promise<void>;
   clearAppData: () => Promise<void>;
   addProvisionedDevice: (input: Pick<Device, 'macAddress' | 'name' | 'mqttUrl' | 'mqttTopic' | 'backendUrl'>) => Promise<void>;
   removeDevice: (deviceId: string) => Promise<void>;
@@ -48,6 +52,22 @@ const defaultConfig: AppConfig = {
   llmStatus: '离线',
   webdavUrl: 'https://storage.local/webdav/plants/',
   syncEnabled: false,
+  waterConfig: '',
+  lightConfig: '',
+};
+
+const defaultWaterConfig: WaterConfig = {
+  actionMode: 'default',
+  actionType: 'water',
+  durationMode: 'default',
+  duration: '5',
+};
+
+const defaultLightConfig: LightConfig = {
+  rgbMode: 'default',
+  r: '255',
+  g: '0',
+  b: '128',
 };
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -58,20 +78,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   devicePresence: {},
   mqttConnectionStatus: {},
   lightState: {},
+  waterConfig: defaultWaterConfig,
+  lightConfig: defaultLightConfig,
   hydrate: async () => {
     await initDatabase();
     const [config, devices] = await Promise.all([getConfig(), getDevices()]);
+
+    let waterConfig = defaultWaterConfig;
+    let lightConfig = defaultLightConfig;
+    try {
+      if (config.waterConfig) waterConfig = JSON.parse(config.waterConfig);
+    } catch {}
+    try {
+      if (config.lightConfig) lightConfig = JSON.parse(config.lightConfig);
+    } catch {}
 
     set({
       ready: true,
       config,
       devices,
       liveStats: buildLiveStats(devices, get().liveStats),
+      waterConfig,
+      lightConfig,
     });
   },
   saveSettings: async (config) => {
     await saveConfig(config);
     set({ config });
+  },
+  saveWaterConfig: async (waterConfig) => {
+    const config = { ...get().config, waterConfig: JSON.stringify(waterConfig) };
+    await saveConfig(config);
+    set({ waterConfig, config });
+  },
+  saveLightConfig: async (lightConfig) => {
+    const config = { ...get().config, lightConfig: JSON.stringify(lightConfig) };
+    await saveConfig(config);
+    set({ lightConfig, config });
   },
   clearAppData: async () => {
     await clearLocalData();

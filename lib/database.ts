@@ -9,6 +9,8 @@ const defaultConfig: AppConfig = {
   llmStatus: "离线",
   webdavUrl: "https://storage.local/webdav/plants/",
   syncEnabled: false,
+  waterConfig: JSON.stringify({ actionMode: 'default', actionType: 'water', durationMode: 'default', duration: '5' }),
+  lightConfig: JSON.stringify({ rgbMode: 'default', r: '255', g: '0', b: '128' }),
 };
 
 export async function initDatabase() {
@@ -186,6 +188,8 @@ export async function getConfig(): Promise<AppConfig> {
     llmStatus: config.llmStatus ?? defaultConfig.llmStatus,
     webdavUrl: config.webdavUrl ?? defaultConfig.webdavUrl,
     syncEnabled: config.syncEnabled === "true",
+    waterConfig: config.waterConfig ?? defaultConfig.waterConfig,
+    lightConfig: config.lightConfig ?? defaultConfig.lightConfig,
   };
 }
 

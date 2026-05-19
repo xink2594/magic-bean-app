@@ -23,14 +23,34 @@ export default function DeviceDetailScreen() {
   const [selectedMetric, setSelectedMetric] = useState<'temp' | 'airHumidity' | 'soilHumidity'>('temp');
   const [showWaterDialog, setShowWaterDialog] = useState(false);
   const [showLightDialog, setShowLightDialog] = useState(false);
-  const [waterActionMode, setWaterActionMode] = useState<'default' | 'custom'>('default');
-  const [waterActionType, setWaterActionType] = useState<'water' | 'led_water'>('water');
-  const [waterDurationMode, setWaterDurationMode] = useState<'default' | 'custom'>('default');
-  const [waterDuration, setWaterDuration] = useState('5');
-  const [lightRgbMode, setLightRgbMode] = useState<'default' | 'custom'>('default');
-  const [lightR, setLightR] = useState('255');
-  const [lightG, setLightG] = useState('0');
-  const [lightB, setLightB] = useState('128');
+  const waterConfig = useAppStore((state) => state.waterConfig);
+  const lightConfig = useAppStore((state) => state.lightConfig);
+  const saveWaterConfigStore = useAppStore((state) => state.saveWaterConfig);
+  const saveLightConfigStore = useAppStore((state) => state.saveLightConfig);
+
+  // 弹窗临时编辑状态
+  const [editWater, setEditWater] = useState(waterConfig);
+  const [editLight, setEditLight] = useState(lightConfig);
+
+  const openWaterDialog = () => {
+    setEditWater({ ...waterConfig });
+    setShowWaterDialog(true);
+  };
+
+  const openLightDialog = () => {
+    setEditLight({ ...lightConfig });
+    setShowLightDialog(true);
+  };
+
+  const handleSaveWater = () => {
+    saveWaterConfigStore(editWater);
+    setShowWaterDialog(false);
+  };
+
+  const handleSaveLight = () => {
+    saveLightConfigStore(editLight);
+    setShowLightDialog(false);
+  };
 
   const lightState = useAppStore((state) => state.getLightState(device?.macAddress ?? ''));
   const lightIsOn = lightState?.state === 'on';
@@ -68,8 +88,9 @@ export default function DeviceDetailScreen() {
   const online = isDeviceOnline(device.macAddress);
 
   const sendWaterCommand = () => {
-    const seconds = Math.max(5, Math.min(60, parseInt(waterDuration, 10) || 5));
-    const action = waterActionMode === 'default' ? 'water' : waterActionType;
+    const wc = waterConfig;
+    const seconds = Math.max(5, Math.min(60, parseInt(wc.duration, 10) || 5));
+    const action = wc.actionMode === 'default' ? 'water' : wc.actionType;
     const payload: Record<string, unknown> = { set_time: seconds };
     if (action === 'led_water') {
       payload.r = 0;
@@ -89,9 +110,10 @@ export default function DeviceDetailScreen() {
     if (lightIsOn) {
       payload = { r: 0, g: 0, b: 0 };
     } else {
-      payload = lightRgbMode === 'default'
+      const lc = lightConfig;
+      payload = lc.rgbMode === 'default'
         ? { r: 255, g: 0, b: 128 }
-        : { r: parseInt(lightR, 10) || 0, g: parseInt(lightG, 10) || 0, b: parseInt(lightB, 10) || 0 };
+        : { r: parseInt(lc.r, 10) || 0, g: parseInt(lc.g, 10) || 0, b: parseInt(lc.b, 10) || 0 };
     }
     const success = publishDeviceCommand(device, 'light', payload);
     if (success) {
@@ -362,7 +384,7 @@ export default function DeviceDetailScreen() {
                 icon="cog-outline"
                 size={20}
                 mode="contained-tonal"
-                onPress={() => setShowWaterDialog(true)}
+                onPress={openWaterDialog}
               />
             </View>
             <View style={styles.controlRow}>
@@ -377,7 +399,7 @@ export default function DeviceDetailScreen() {
                 icon="cog-outline"
                 size={20}
                 mode="contained-tonal"
-                onPress={() => setShowLightDialog(true)}
+                onPress={openLightDialog}
               />
             </View>
             <Button mode="outlined" onPress={() => publishDeviceCommand(device, 'capture', {})}>
@@ -428,29 +450,29 @@ export default function DeviceDetailScreen() {
               <Text variant="titleSmall" style={styles.configLabel}>动作类型</Text>
               <View style={styles.configOptions}>
                 <Chip
-                  selected={waterActionMode === 'default'}
-                  onPress={() => setWaterActionMode('default')}
+                  selected={editWater.actionMode === 'default'}
+                  onPress={() => setEditWater({ ...editWater, actionMode: 'default' })}
                   style={styles.configChip}>
                   默认 (water)
                 </Chip>
                 <Chip
-                  selected={waterActionMode === 'custom'}
-                  onPress={() => setWaterActionMode('custom')}
+                  selected={editWater.actionMode === 'custom'}
+                  onPress={() => setEditWater({ ...editWater, actionMode: 'custom' })}
                   style={styles.configChip}>
                   自定义
                 </Chip>
               </View>
-              {waterActionMode === 'custom' && (
+              {editWater.actionMode === 'custom' && (
                 <View style={styles.configOptions}>
                   <Chip
-                    selected={waterActionType === 'water'}
-                    onPress={() => setWaterActionType('water')}
+                    selected={editWater.actionType === 'water'}
+                    onPress={() => setEditWater({ ...editWater, actionType: 'water' })}
                     style={styles.configChip}>
                     water
                   </Chip>
                   <Chip
-                    selected={waterActionType === 'led_water'}
-                    onPress={() => setWaterActionType('led_water')}
+                    selected={editWater.actionType === 'led_water'}
+                    onPress={() => setEditWater({ ...editWater, actionType: 'led_water' })}
                     style={styles.configChip}>
                     led_water
                   </Chip>
@@ -460,24 +482,24 @@ export default function DeviceDetailScreen() {
               <Text variant="titleSmall" style={styles.configLabel}>持续时间</Text>
               <View style={styles.configOptions}>
                 <Chip
-                  selected={waterDurationMode === 'default'}
-                  onPress={() => setWaterDurationMode('default')}
+                  selected={editWater.durationMode === 'default'}
+                  onPress={() => setEditWater({ ...editWater, durationMode: 'default' })}
                   style={styles.configChip}>
                   默认 (5 秒)
                 </Chip>
                 <Chip
-                  selected={waterDurationMode === 'custom'}
-                  onPress={() => setWaterDurationMode('custom')}
+                  selected={editWater.durationMode === 'custom'}
+                  onPress={() => setEditWater({ ...editWater, durationMode: 'custom' })}
                   style={styles.configChip}>
                   自定义
                 </Chip>
               </View>
-              {waterDurationMode === 'custom' && (
+              {editWater.durationMode === 'custom' && (
                 <TextInput
                   mode="outlined"
                   keyboardType="number-pad"
-                  value={waterDuration}
-                  onChangeText={(text) => setWaterDuration(text.replace(/[^0-9]/g, ''))}
+                  value={editWater.duration}
+                  onChangeText={(text) => setEditWater({ ...editWater, duration: text.replace(/[^0-9]/g, '') })}
                   right={<TextInput.Affix text="秒" />}
                   dense
                   style={styles.configInput}
@@ -487,7 +509,7 @@ export default function DeviceDetailScreen() {
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowWaterDialog(false)}>取消</Button>
-            <Button onPress={() => setShowWaterDialog(false)}>保存</Button>
+            <Button onPress={handleSaveWater}>保存</Button>
           </Dialog.Actions>
         </Dialog>
 
@@ -499,27 +521,27 @@ export default function DeviceDetailScreen() {
               <Text variant="titleSmall" style={styles.configLabel}>RGB</Text>
               <View style={styles.configOptions}>
                 <Chip
-                  selected={lightRgbMode === 'default'}
-                  onPress={() => setLightRgbMode('default')}
+                  selected={editLight.rgbMode === 'default'}
+                  onPress={() => setEditLight({ ...editLight, rgbMode: 'default' })}
                   style={styles.configChip}>
                   默认 (255, 0, 128)
                 </Chip>
                 <Chip
-                  selected={lightRgbMode === 'custom'}
-                  onPress={() => setLightRgbMode('custom')}
+                  selected={editLight.rgbMode === 'custom'}
+                  onPress={() => setEditLight({ ...editLight, rgbMode: 'custom' })}
                   style={styles.configChip}>
                   自定义
                 </Chip>
               </View>
-              {lightRgbMode === 'custom' && (
+              {editLight.rgbMode === 'custom' && (
                 <>
                   <View style={styles.rgbRow}>
                     <Text variant="bodyMedium" style={styles.rgbLabel}>R</Text>
                     <TextInput
                       mode="outlined"
                       keyboardType="number-pad"
-                      value={lightR}
-                      onChangeText={(text) => setLightR(text.replace(/[^0-9]/g, ''))}
+                      value={editLight.r}
+                      onChangeText={(text) => setEditLight({ ...editLight, r: text.replace(/[^0-9]/g, '') })}
                       dense
                       style={styles.rgbInput}
                     />
@@ -529,8 +551,8 @@ export default function DeviceDetailScreen() {
                     <TextInput
                       mode="outlined"
                       keyboardType="number-pad"
-                      value={lightG}
-                      onChangeText={(text) => setLightG(text.replace(/[^0-9]/g, ''))}
+                      value={editLight.g}
+                      onChangeText={(text) => setEditLight({ ...editLight, g: text.replace(/[^0-9]/g, '') })}
                       dense
                       style={styles.rgbInput}
                     />
@@ -540,8 +562,8 @@ export default function DeviceDetailScreen() {
                     <TextInput
                       mode="outlined"
                       keyboardType="number-pad"
-                      value={lightB}
-                      onChangeText={(text) => setLightB(text.replace(/[^0-9]/g, ''))}
+                      value={editLight.b}
+                      onChangeText={(text) => setEditLight({ ...editLight, b: text.replace(/[^0-9]/g, '') })}
                       dense
                       style={styles.rgbInput}
                     />
@@ -552,7 +574,7 @@ export default function DeviceDetailScreen() {
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowLightDialog(false)}>取消</Button>
-            <Button onPress={() => setShowLightDialog(false)}>保存</Button>
+            <Button onPress={handleSaveLight}>保存</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
