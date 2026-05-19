@@ -172,6 +172,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     return get().mqttConnectionStatus[brokerUrl] ?? 'disconnected';
   },
   setLightState: (macAddress, data) => {
+    console.log('[Store] setLightState:', macAddress, JSON.stringify(data));
     set((state) => ({
       lightState: {
         ...state.lightState,

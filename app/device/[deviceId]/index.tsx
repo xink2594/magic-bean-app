@@ -27,9 +27,7 @@ export default function DeviceDetailScreen() {
   const [waterActionType, setWaterActionType] = useState<'water' | 'led_water'>('water');
   const [waterDurationMode, setWaterDurationMode] = useState<'default' | 'custom'>('default');
   const [waterDuration, setWaterDuration] = useState('5');
-  const [lightRMode, setLightRMode] = useState<'default' | 'custom'>('default');
-  const [lightGMode, setLightGMode] = useState<'default' | 'custom'>('default');
-  const [lightBMode, setLightBMode] = useState<'default' | 'custom'>('default');
+  const [lightRgbMode, setLightRgbMode] = useState<'default' | 'custom'>('default');
   const [lightR, setLightR] = useState('255');
   const [lightG, setLightG] = useState('0');
   const [lightB, setLightB] = useState('128');
@@ -69,11 +67,8 @@ export default function DeviceDetailScreen() {
 
   const online = isDeviceOnline(device.macAddress);
 
-  const handleWaterConfirm = () => {
+  const sendWaterCommand = () => {
     const seconds = Math.max(5, Math.min(60, parseInt(waterDuration, 10) || 5));
-    setWaterDuration(String(seconds));
-    setShowWaterDialog(false);
-
     const action = waterActionMode === 'default' ? 'water' : waterActionType;
     const payload: Record<string, unknown> = { set_time: seconds };
     if (action === 'led_water') {
@@ -81,7 +76,6 @@ export default function DeviceDetailScreen() {
       payload.g = 100;
       payload.b = 255;
     }
-
     const success = publishDeviceCommand(device, action, payload);
     if (success) {
       setMessage(`浇水指令已发送，持续 ${seconds} 秒`);
@@ -90,18 +84,15 @@ export default function DeviceDetailScreen() {
     }
   };
 
-  const handleLightAction = () => {
+  const sendLightCommand = () => {
     let payload: Record<string, unknown>;
-
     if (lightIsOn) {
       payload = { r: 0, g: 0, b: 0 };
     } else {
-      const r = lightRMode === 'default' ? 255 : (parseInt(lightR, 10) || 0);
-      const g = lightGMode === 'default' ? 0 : (parseInt(lightG, 10) || 0);
-      const b = lightBMode === 'default' ? 128 : (parseInt(lightB, 10) || 0);
-      payload = { r, g, b };
+      payload = lightRgbMode === 'default'
+        ? { r: 255, g: 0, b: 128 }
+        : { r: parseInt(lightR, 10) || 0, g: parseInt(lightG, 10) || 0, b: parseInt(lightB, 10) || 0 };
     }
-
     const success = publishDeviceCommand(device, 'light', payload);
     if (success) {
       setMessage(lightIsOn ? '补光已关闭' : '补光指令已发送');
@@ -362,7 +353,7 @@ export default function DeviceDetailScreen() {
             <View style={styles.controlRow}>
               <Button
                 mode="outlined"
-                onPress={() => { setWaterDuration('5'); setWaterActionMode('default'); setWaterDurationMode('default'); setWaterActionType('water'); setShowWaterDialog(true); }}
+                onPress={sendWaterCommand}
                 style={styles.controlButton}
                 icon="water">
                 浇水
@@ -371,13 +362,13 @@ export default function DeviceDetailScreen() {
                 icon="cog-outline"
                 size={20}
                 mode="contained-tonal"
-                onPress={() => { setWaterDuration('5'); setWaterActionMode('default'); setWaterDurationMode('default'); setWaterActionType('water'); setShowWaterDialog(true); }}
+                onPress={() => setShowWaterDialog(true)}
               />
             </View>
             <View style={styles.controlRow}>
               <Button
                 mode={lightIsOn ? 'contained' : 'outlined'}
-                onPress={handleLightAction}
+                onPress={sendLightCommand}
                 style={[styles.controlButton, lightIsOn && { backgroundColor: '#1B5E20' }]}
                 icon="lightbulb">
                 补光
@@ -496,7 +487,7 @@ export default function DeviceDetailScreen() {
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowWaterDialog(false)}>取消</Button>
-            <Button onPress={handleWaterConfirm}>确认发送</Button>
+            <Button onPress={() => setShowWaterDialog(false)}>保存</Button>
           </Dialog.Actions>
         </Dialog>
 
@@ -505,91 +496,63 @@ export default function DeviceDetailScreen() {
           <Dialog.Title>补光配置</Dialog.Title>
           <Dialog.ScrollArea>
             <ScrollView style={styles.dialogBody}>
-              <Text variant="titleSmall" style={styles.configLabel}>R (红)</Text>
+              <Text variant="titleSmall" style={styles.configLabel}>RGB</Text>
               <View style={styles.configOptions}>
                 <Chip
-                  selected={lightRMode === 'default'}
-                  onPress={() => setLightRMode('default')}
+                  selected={lightRgbMode === 'default'}
+                  onPress={() => setLightRgbMode('default')}
                   style={styles.configChip}>
-                  默认 (255)
+                  默认 (255, 0, 128)
                 </Chip>
                 <Chip
-                  selected={lightRMode === 'custom'}
-                  onPress={() => setLightRMode('custom')}
+                  selected={lightRgbMode === 'custom'}
+                  onPress={() => setLightRgbMode('custom')}
                   style={styles.configChip}>
                   自定义
                 </Chip>
               </View>
-              {lightRMode === 'custom' && (
-                <TextInput
-                  mode="outlined"
-                  keyboardType="number-pad"
-                  value={lightR}
-                  onChangeText={(text) => setLightR(text.replace(/[^0-9]/g, ''))}
-                  right={<TextInput.Affix text="0-255" />}
-                  dense
-                  style={styles.configInput}
-                />
-              )}
-
-              <Text variant="titleSmall" style={styles.configLabel}>G (绿)</Text>
-              <View style={styles.configOptions}>
-                <Chip
-                  selected={lightGMode === 'default'}
-                  onPress={() => setLightGMode('default')}
-                  style={styles.configChip}>
-                  默认 (0)
-                </Chip>
-                <Chip
-                  selected={lightGMode === 'custom'}
-                  onPress={() => setLightGMode('custom')}
-                  style={styles.configChip}>
-                  自定义
-                </Chip>
-              </View>
-              {lightGMode === 'custom' && (
-                <TextInput
-                  mode="outlined"
-                  keyboardType="number-pad"
-                  value={lightG}
-                  onChangeText={(text) => setLightG(text.replace(/[^0-9]/g, ''))}
-                  right={<TextInput.Affix text="0-255" />}
-                  dense
-                  style={styles.configInput}
-                />
-              )}
-
-              <Text variant="titleSmall" style={styles.configLabel}>B (蓝)</Text>
-              <View style={styles.configOptions}>
-                <Chip
-                  selected={lightBMode === 'default'}
-                  onPress={() => setLightBMode('default')}
-                  style={styles.configChip}>
-                  默认 (128)
-                </Chip>
-                <Chip
-                  selected={lightBMode === 'custom'}
-                  onPress={() => setLightBMode('custom')}
-                  style={styles.configChip}>
-                  自定义
-                </Chip>
-              </View>
-              {lightBMode === 'custom' && (
-                <TextInput
-                  mode="outlined"
-                  keyboardType="number-pad"
-                  value={lightB}
-                  onChangeText={(text) => setLightB(text.replace(/[^0-9]/g, ''))}
-                  right={<TextInput.Affix text="0-255" />}
-                  dense
-                  style={styles.configInput}
-                />
+              {lightRgbMode === 'custom' && (
+                <>
+                  <View style={styles.rgbRow}>
+                    <Text variant="bodyMedium" style={styles.rgbLabel}>R</Text>
+                    <TextInput
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      value={lightR}
+                      onChangeText={(text) => setLightR(text.replace(/[^0-9]/g, ''))}
+                      dense
+                      style={styles.rgbInput}
+                    />
+                  </View>
+                  <View style={styles.rgbRow}>
+                    <Text variant="bodyMedium" style={styles.rgbLabel}>G</Text>
+                    <TextInput
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      value={lightG}
+                      onChangeText={(text) => setLightG(text.replace(/[^0-9]/g, ''))}
+                      dense
+                      style={styles.rgbInput}
+                    />
+                  </View>
+                  <View style={styles.rgbRow}>
+                    <Text variant="bodyMedium" style={styles.rgbLabel}>B</Text>
+                    <TextInput
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      value={lightB}
+                      onChangeText={(text) => setLightB(text.replace(/[^0-9]/g, ''))}
+                      dense
+                      style={styles.rgbInput}
+                    />
+                  </View>
+                </>
               )}
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button onPress={() => setShowLightDialog(false)}>取消</Button>
-            <Button onPress={() => { setShowLightDialog(false); handleLightAction(); }}>确认发送</Button>
+            <Button onPress={() => setShowLightDialog(false)}>保存</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -726,6 +689,21 @@ const styles = StyleSheet.create({
   configInput: {
     backgroundColor: '#FFFDF8',
     marginBottom: 8,
+  },
+  rgbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  rgbLabel: {
+    width: 20,
+    color: '#617062',
+    fontWeight: '600',
+  },
+  rgbInput: {
+    flex: 1,
+    backgroundColor: '#FFFDF8',
   },
   mqttStatusRow: {
     flexDirection: 'row',

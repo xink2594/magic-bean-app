@@ -146,12 +146,17 @@ export function connectToDevice(device: Device): boolean {
 
       // 尝试从 light 主题格式解析
       const lightMac = extractMacAddressFromLightTopic(topic);
-      if (lightMac && onLightDataCallback) {
-        try {
-          const parsed = JSON.parse(payload.toString()) as LightData;
-          onLightDataCallback(lightMac, parsed);
-        } catch (error) {
-          console.warn('[MQTT Data] Failed to parse light data:', topic, error);
+      if (lightMac) {
+        console.log('[MQTT Data] Light topic message:', topic, payload.toString());
+        if (onLightDataCallback) {
+          try {
+            const parsed = JSON.parse(payload.toString()) as LightData;
+            onLightDataCallback(lightMac, parsed);
+          } catch (error) {
+            console.warn('[MQTT Data] Failed to parse light data:', topic, error);
+          }
+        } else {
+          console.warn('[MQTT Data] Light message received but no callback registered');
         }
         return;
       }
