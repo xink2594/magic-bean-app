@@ -351,15 +351,22 @@ export async function fetchDiaryDetail(
   }
 }
 
-// 保存日记备注
+// 保存日记备注及环境数据
 export async function saveDiaryNote(
   id: number,
   note: string,
+  temperature?: number,
+  airHumidity?: number,
+  dirtHumidity?: number,
   deviceBackendUrl?: string,
 ): Promise<boolean> {
   try {
     const client = getClient(deviceBackendUrl);
-    const response = await client.post('/api/diary/save', { id, note });
+    const body: Record<string, unknown> = { id, note };
+    if (temperature !== undefined) body.temperature = temperature;
+    if (airHumidity !== undefined) body.airHumidity = airHumidity;
+    if (dirtHumidity !== undefined) body.dirtHumidity = dirtHumidity;
+    const response = await client.post('/api/diary/save', body);
     return response.data.code === 200;
   } catch (error) {
     console.error('[API] saveDiaryNote error:', error);

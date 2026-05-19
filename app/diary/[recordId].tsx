@@ -15,6 +15,9 @@ export default function DiaryDetailScreen() {
 
   const [detail, setDetail] = useState<DiaryDetail | null>(null);
   const [note, setNote] = useState('');
+  const [temperature, setTemperature] = useState('');
+  const [airHumidity, setAirHumidity] = useState('');
+  const [dirtHumidity, setDirtHumidity] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -37,6 +40,9 @@ export default function DiaryDetailScreen() {
     if (result) {
       setDetail(result);
       setNote(result.note || '');
+      setTemperature(String(result.temperature));
+      setAirHumidity(String(result.airHumidity));
+      setDirtHumidity(String(result.dirtHumidity));
     }
     setLoading(false);
   }, [device?.macAddress, device?.backendUrl, recordId]);
@@ -49,12 +55,25 @@ export default function DiaryDetailScreen() {
     if (!detail) return;
 
     setSaving(true);
-    const success = await saveDiaryNote(detail.id, note, device?.backendUrl);
+    const success = await saveDiaryNote(
+      detail.id,
+      note,
+      Number(temperature) || detail.temperature,
+      Number(airHumidity) || detail.airHumidity,
+      Number(dirtHumidity) || detail.dirtHumidity,
+      device?.backendUrl,
+    );
     setSaving(false);
 
     if (success) {
-      setDetail({ ...detail, note });
-      setMessage('备注已保存');
+      setDetail({
+        ...detail,
+        note,
+        temperature: Number(temperature) || detail.temperature,
+        airHumidity: Number(airHumidity) || detail.airHumidity,
+        dirtHumidity: Number(dirtHumidity) || detail.dirtHumidity,
+      });
+      setMessage('已保存');
     } else {
       setMessage('保存失败，请重试');
     }
@@ -158,7 +177,15 @@ export default function DiaryDetailScreen() {
             <Text variant="titleLarge" style={styles.headerTitle}>
               手记详情
             </Text>
-            <View style={{ width: 48 }} />
+            <IconButton
+              icon="check"
+              size={24}
+              mode="contained-tonal"
+              iconColor="#2C6E49"
+              onPress={handleSave}
+              loading={saving}
+              disabled={saving}
+            />
           </View>
 
           {/* 图片 */}
@@ -184,30 +211,48 @@ export default function DiaryDetailScreen() {
           <Card style={styles.card}>
             <Card.Content style={styles.statsContent}>
               <View style={styles.statItem}>
-                <Text variant="labelMedium" style={styles.statLabel}>温度</Text>
-                <Text variant="titleLarge" style={styles.statValue}>
-                  {detail.temperature.toFixed(1)}°C
-                </Text>
+                <TextInput
+                  label="温度"
+                  value={temperature}
+                  onChangeText={setTemperature}
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  right={<TextInput.Affix text="°C" />}
+                  dense
+                  style={styles.statInput}
+                />
               </View>
               <View style={styles.statItem}>
-                <Text variant="labelMedium" style={styles.statLabel}>空气湿度</Text>
-                <Text variant="titleLarge" style={styles.statValue}>
-                  {detail.airHumidity.toFixed(0)}%
-                </Text>
+                <TextInput
+                  label="空气湿度"
+                  value={airHumidity}
+                  onChangeText={setAirHumidity}
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  right={<TextInput.Affix text="%" />}
+                  dense
+                  style={styles.statInput}
+                />
               </View>
               <View style={styles.statItem}>
-                <Text variant="labelMedium" style={styles.statLabel}>土壤湿度</Text>
-                <Text variant="titleLarge" style={styles.statValue}>
-                  {detail.dirtHumidity.toFixed(0)}%
-                </Text>
+                <TextInput
+                  label="土壤湿度"
+                  value={dirtHumidity}
+                  onChangeText={setDirtHumidity}
+                  mode="outlined"
+                  keyboardType="decimal-pad"
+                  right={<TextInput.Affix text="%" />}
+                  dense
+                  style={styles.statInput}
+                />
               </View>
             </Card.Content>
           </Card>
 
-          {/* 备注编辑 */}
+          {/* Note */}
           <Card style={styles.card}>
             <Card.Content style={styles.noteContent}>
-              <Text variant="titleMedium">备注</Text>
+              <Text variant="titleMedium">Note</Text>
               <TextInput
                 value={note}
                 onChangeText={setNote}
@@ -217,13 +262,6 @@ export default function DiaryDetailScreen() {
                 placeholder="记录一下植物的状态吧..."
                 style={styles.noteInput}
               />
-              <Button
-                mode="contained"
-                onPress={handleSave}
-                loading={saving}
-                disabled={saving || note === (detail.note || '')}>
-                保存备注
-              </Button>
             </Card.Content>
           </Card>
 
@@ -357,19 +395,13 @@ const styles = StyleSheet.create({
   },
   statsContent: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 8,
+    gap: 10,
   },
   statItem: {
-    alignItems: 'center',
-    gap: 4,
+    flex: 1,
   },
-  statLabel: {
-    color: '#617062',
-  },
-  statValue: {
-    color: '#163020',
-    fontWeight: '700',
+  statInput: {
+    backgroundColor: '#FFFDF8',
   },
   noteContent: {
     gap: 12,
