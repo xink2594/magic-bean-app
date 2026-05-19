@@ -382,7 +382,7 @@ export default function DeviceDetailScreen() {
                 iconColor="#B3261E"
                 onPress={() => {
                   publishDeviceCommand(device, 'light', { r: 0, g: 0, b: 0 });
-                  setMessage('已关闭所有元件');
+                  setMessage('已重置状态');
                 }}
               />
             </View>
@@ -409,7 +409,7 @@ export default function DeviceDetailScreen() {
                 buttonColor={lightIsOn ? '#2C6E49' : undefined}
                 textColor={lightIsOn ? '#fff' : undefined}
                 icon="lightbulb">
-                补光 {lightIsOn ? '(ON)' : ''}
+                补光
               </Button>
               <IconButton
                 icon="cog-outline"
